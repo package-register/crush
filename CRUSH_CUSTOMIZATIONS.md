@@ -215,4 +215,13 @@
 
 ---
 
+## 合并后修复（2025-03-08）
+
+合并官方 v0.47.2 后，`internal/ui/model/keys_test.go` 因 Bubble Tea v2 API 变更导致编译失败：
+
+- **问题**：`tea.KeyPressMsg{Key: tea.KeyCtrlC}` 在 v2 中已废弃（无 `Key` 字段，无 `KeyCtrlC` 常量）
+- **修复**：使用 `testKey("ctrl+c")` 实现 `fmt.Stringer`，`key.Matches` 仅依赖 `String()` 比较
+
+---
+
 *最后更新：2025-03-08*
