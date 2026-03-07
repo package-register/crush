@@ -1,0 +1,25 @@
+# modes.toml - Custom agent modes for crush
+# Place this file in project root, .crush/, or ~/.config/crush/
+# Modes from later paths override earlier ones.
+
+[modes.git]
+id = "git"
+name = "Git"
+description = "Agent focused on Git operations and version control"
+model = "large"
+allowed_tools = ["bash", "edit", "view", "grep", "glob", "ls", "fetch", "write", "multiedit", "list_mcp_resources", "read_mcp_resource"]
+# allowed_mcp = { "git-mcp" = ["git_status", "git_diff"] }
+
+[modes.rust]
+id = "rust"
+name = "Rust"
+description = "Agent focused on Rust development with LSP support"
+model = "large"
+allowed_tools = ["bash", "edit", "view", "grep", "glob", "ls", "lsp_diagnostics", "lsp_references", "lsp_restart", "fetch", "write", "multiedit", "todos", "list_mcp_resources", "read_mcp_resource"]
+
+[modes.plan]
+id = "plan"
+name = "Plan"
+description = "Agent focused on planning and task breakdown"
+model = "large"
+allowed_tools = ["view", "grep", "glob", "ls", "sourcegraph", "list_mcp_resources", "read_mcp_resource"]

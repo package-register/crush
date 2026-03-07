@@ -66,7 +66,21 @@ type KeyMap struct {
 	Tab      key.Binding
 }
 
+// DefaultKeyMapForScheme returns the keymap for the given scheme.
+// scheme: "ide" (ALT-based for VS Code/Cursor) or "standalone" (CTRL-based).
+func DefaultKeyMapForScheme(scheme string) KeyMap {
+	if scheme == "ide" {
+		return defaultKeyMapIDE()
+	}
+	return defaultKeyMapStandalone()
+}
+
+// DefaultKeyMap returns the standalone (CTRL-based) keymap for backward compatibility.
 func DefaultKeyMap() KeyMap {
+	return defaultKeyMapStandalone()
+}
+
+func defaultKeyMapStandalone() KeyMap {
 	km := KeyMap{
 		Quit: key.NewBinding(
 			key.WithKeys("ctrl+c"),
@@ -111,11 +125,10 @@ func DefaultKeyMap() KeyMap {
 		key.WithHelp("ctrl+o", "open editor"),
 	)
 	km.Editor.Newline = key.NewBinding(
-		key.WithKeys("shift+enter", "ctrl+j"),
-		// "ctrl+j" is a common keybinding for newline in many editors. If
-		// the terminal supports "shift+enter", we substitute the help tex
-		// to reflect that.
-		key.WithHelp("ctrl+j", "newline"),
+		key.WithKeys("shift+enter", "shift+return", "ctrl+j"),
+		// shift+enter/return for newline; ctrl+j fallback. Some terminals
+		// report "shift+return" instead of "shift+enter".
+		key.WithHelp("shift+enter", "newline"),
 	)
 	km.Editor.AddImage = key.NewBinding(
 		key.WithKeys("ctrl+f"),
@@ -191,6 +204,203 @@ func DefaultKeyMap() KeyMap {
 	)
 	km.Chat.Up = key.NewBinding(
 		key.WithKeys("up", "ctrl+k", "k"),
+		key.WithHelp("↑", "up"),
+	)
+	km.Chat.UpDown = key.NewBinding(
+		key.WithKeys("up", "down"),
+		key.WithHelp("↑↓", "scroll"),
+	)
+	km.Chat.UpOneItem = key.NewBinding(
+		key.WithKeys("shift+up", "K"),
+		key.WithHelp("shift+↑", "up one item"),
+	)
+	km.Chat.DownOneItem = key.NewBinding(
+		key.WithKeys("shift+down", "J"),
+		key.WithHelp("shift+↓", "down one item"),
+	)
+	km.Chat.UpDownOneItem = key.NewBinding(
+		key.WithKeys("shift+up", "shift+down"),
+		key.WithHelp("shift+↑↓", "scroll one item"),
+	)
+	km.Chat.HalfPageDown = key.NewBinding(
+		key.WithKeys("d"),
+		key.WithHelp("d", "half page down"),
+	)
+	km.Chat.PageDown = key.NewBinding(
+		key.WithKeys("pgdown", " ", "f"),
+		key.WithHelp("f/pgdn", "page down"),
+	)
+	km.Chat.PageUp = key.NewBinding(
+		key.WithKeys("pgup", "b"),
+		key.WithHelp("b/pgup", "page up"),
+	)
+	km.Chat.HalfPageUp = key.NewBinding(
+		key.WithKeys("u"),
+		key.WithHelp("u", "half page up"),
+	)
+	km.Chat.Home = key.NewBinding(
+		key.WithKeys("g", "home"),
+		key.WithHelp("g", "home"),
+	)
+	km.Chat.End = key.NewBinding(
+		key.WithKeys("G", "end"),
+		key.WithHelp("G", "end"),
+	)
+	km.Chat.Copy = key.NewBinding(
+		key.WithKeys("c", "y", "C", "Y"),
+		key.WithHelp("c/y", "copy"),
+	)
+	km.Chat.ClearHighlight = key.NewBinding(
+		key.WithKeys("esc", "alt+esc"),
+		key.WithHelp("esc", "clear selection"),
+	)
+	km.Chat.Expand = key.NewBinding(
+		key.WithKeys("space"),
+		key.WithHelp("space", "expand/collapse"),
+	)
+	km.Initialize.Yes = key.NewBinding(
+		key.WithKeys("y", "Y"),
+		key.WithHelp("y", "yes"),
+	)
+	km.Initialize.No = key.NewBinding(
+		key.WithKeys("n", "N", "esc", "alt+esc"),
+		key.WithHelp("n", "no"),
+	)
+	km.Initialize.Switch = key.NewBinding(
+		key.WithKeys("left", "right", "tab"),
+		key.WithHelp("tab", "switch"),
+	)
+	km.Initialize.Enter = key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "select"),
+	)
+
+	return km
+}
+
+// defaultKeyMapIDE returns ALT-based keymap for IDE embedded terminals (VS Code/Cursor).
+func defaultKeyMapIDE() KeyMap {
+	km := KeyMap{
+		Quit: key.NewBinding(
+			key.WithKeys("alt+q"),
+			key.WithHelp("alt+q", "quit"),
+		),
+		Help: key.NewBinding(
+			key.WithKeys("alt+g"),
+			key.WithHelp("alt+g", "more"),
+		),
+		Commands: key.NewBinding(
+			key.WithKeys("alt+p"),
+			key.WithHelp("alt+p", "commands"),
+		),
+		Models: key.NewBinding(
+			key.WithKeys("alt+m"),
+			key.WithHelp("alt+m", "models"),
+		),
+		Suspend: key.NewBinding(
+			key.WithKeys("alt+z"),
+			key.WithHelp("alt+z", "suspend"),
+		),
+		Sessions: key.NewBinding(
+			key.WithKeys("alt+s"),
+			key.WithHelp("alt+s", "sessions"),
+		),
+		Tab: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "change focus"),
+		),
+	}
+
+	km.Editor.AddFile = key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "add file"),
+	)
+	km.Editor.SendMessage = key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "send"),
+	)
+	km.Editor.OpenEditor = key.NewBinding(
+		key.WithKeys("alt+o"),
+		key.WithHelp("alt+o", "open editor"),
+	)
+	km.Editor.Newline = key.NewBinding(
+		key.WithKeys("shift+enter", "shift+return", "alt+j"),
+		key.WithHelp("shift+enter", "newline"),
+	)
+	km.Editor.AddImage = key.NewBinding(
+		key.WithKeys("alt+f"),
+		key.WithHelp("alt+f", "add image"),
+	)
+	km.Editor.PasteImage = key.NewBinding(
+		key.WithKeys("alt+v"),
+		key.WithHelp("alt+v", "paste image from clipboard"),
+	)
+	km.Editor.MentionFile = key.NewBinding(
+		key.WithKeys("@"),
+		key.WithHelp("@", "mention file"),
+	)
+	km.Editor.Commands = key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "commands"),
+	)
+	km.Editor.AttachmentDeleteMode = key.NewBinding(
+		key.WithKeys("alt+r"),
+		key.WithHelp("alt+r+{i}", "delete attachment at index i"),
+	)
+	km.Editor.Escape = key.NewBinding(
+		key.WithKeys("esc", "alt+esc"),
+		key.WithHelp("esc", "cancel delete mode"),
+	)
+	km.Editor.DeleteAllAttachments = key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("alt+r+r", "delete all attachments"),
+	)
+	km.Editor.HistoryPrev = key.NewBinding(
+		key.WithKeys("up"),
+	)
+	km.Editor.HistoryNext = key.NewBinding(
+		key.WithKeys("down"),
+	)
+
+	km.Chat.NewSession = key.NewBinding(
+		key.WithKeys("alt+n"),
+		key.WithHelp("alt+n", "new session"),
+	)
+	km.Chat.AddAttachment = key.NewBinding(
+		key.WithKeys("alt+f"),
+		key.WithHelp("alt+f", "add attachment"),
+	)
+	km.Chat.Cancel = key.NewBinding(
+		key.WithKeys("esc", "alt+esc"),
+		key.WithHelp("esc", "cancel"),
+	)
+	km.Chat.Tab = key.NewBinding(
+		key.WithKeys("tab"),
+		key.WithHelp("tab", "change focus"),
+	)
+	km.Chat.Details = key.NewBinding(
+		key.WithKeys("alt+d"),
+		key.WithHelp("alt+d", "toggle details"),
+	)
+	km.Chat.TogglePills = key.NewBinding(
+		key.WithKeys("alt+t"),
+		key.WithHelp("alt+t", "toggle tasks"),
+	)
+	km.Chat.PillLeft = key.NewBinding(
+		key.WithKeys("left"),
+		key.WithHelp("←/→", "switch section"),
+	)
+	km.Chat.PillRight = key.NewBinding(
+		key.WithKeys("right"),
+		key.WithHelp("←/→", "switch section"),
+	)
+
+	km.Chat.Down = key.NewBinding(
+		key.WithKeys("down", "j"),
+		key.WithHelp("↓", "down"),
+	)
+	km.Chat.Up = key.NewBinding(
+		key.WithKeys("up", "k"),
 		key.WithHelp("↑", "up"),
 	)
 	km.Chat.UpDown = key.NewBinding(

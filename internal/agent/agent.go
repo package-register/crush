@@ -12,6 +12,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -108,6 +109,7 @@ type sessionAgent struct {
 	messages             message.Service
 	disableAutoSummarize bool
 	isYolo               bool
+	toolCallFormat       string
 
 	messageQueue   *csync.Map[string, []SessionAgentCall]
 	activeRequests *csync.Map[string, context.CancelFunc]
@@ -124,11 +126,17 @@ type SessionAgentOptions struct {
 	Sessions             session.Service
 	Messages             message.Service
 	Tools                []fantasy.AgentTool
+	// ToolCallFormat: "standard" (default) or "longcat" for <longcat_tool_call> in text
+	ToolCallFormat string
 }
 
 func NewSessionAgent(
 	opts SessionAgentOptions,
 ) SessionAgent {
+	toolCallFormat := opts.ToolCallFormat
+	if toolCallFormat == "" {
+		toolCallFormat = "standard"
+	}
 	return &sessionAgent{
 		largeModel:           csync.NewValue(opts.LargeModel),
 		smallModel:           csync.NewValue(opts.SmallModel),
@@ -140,6 +148,7 @@ func NewSessionAgent(
 		disableAutoSummarize: opts.DisableAutoSummarize,
 		tools:                csync.NewSliceFrom(opts.Tools),
 		isYolo:               opts.IsYolo,
+		toolCallFormat:       toolCallFormat,
 		messageQueue:         csync.NewMap[string, []SessionAgentCall](),
 		activeRequests:       csync.NewMap[string, context.CancelFunc](),
 	}
@@ -239,6 +248,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 
 	var currentAssistant *message.Message
 	var shouldSummarize bool
+	var longcatBuffer string
 	result, err := agent.Stream(genCtx, fantasy.AgentStreamCall{
 		Prompt:           message.PromptWithTextAttachments(call.Prompt, call.Attachments),
 		Files:            files,
@@ -338,6 +348,28 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 			// newlines are very visible.
 			if len(currentAssistant.Parts) == 0 {
 				text = strings.TrimPrefix(text, "\n")
+			}
+
+			if a.toolCallFormat == "longcat" {
+				longcatBuffer += text
+				calls, remaining := ParseLongcatToolCalls(longcatBuffer)
+				for _, tc := range calls {
+					inputBytes, _ := json.Marshal(tc.Arguments)
+					toolCall := message.ToolCall{
+						ID:               "longcat_" + fmt.Sprintf("%d", time.Now().UnixNano()),
+						Name:             tc.Name,
+						Input:            string(inputBytes),
+						ProviderExecuted: false,
+						Finished:         true,
+					}
+					currentAssistant.AddToolCall(toolCall)
+				}
+				longcatBuffer = remaining
+				if HasIncompleteLongcatToolCall(longcatBuffer) {
+					return a.messages.Update(genCtx, *currentAssistant)
+				}
+				text = longcatBuffer
+				longcatBuffer = ""
 			}
 
 			currentAssistant.AppendContent(text)

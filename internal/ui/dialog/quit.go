@@ -34,6 +34,11 @@ func NewQuit(com *common.Common) *Quit {
 		com:        com,
 		selectedNo: true,
 	}
+	scheme := com.Config().EffectiveKeybindingScheme()
+	quitKey, quitHelp := "ctrl+c", "ctrl+c"
+	if scheme == "ide" {
+		quitKey, quitHelp = "alt+q", "alt+q"
+	}
 	q.keyMap.LeftRight = key.NewBinding(
 		key.WithKeys("left", "right"),
 		key.WithHelp("←/→", "switch options"),
@@ -43,8 +48,8 @@ func NewQuit(com *common.Common) *Quit {
 		key.WithHelp("enter/space", "confirm"),
 	)
 	q.keyMap.Yes = key.NewBinding(
-		key.WithKeys("y", "Y", "ctrl+c"),
-		key.WithHelp("y/Y/ctrl+c", "yes"),
+		key.WithKeys("y", "Y", quitKey),
+		key.WithHelp("y/Y/"+quitHelp, "yes"),
 	)
 	q.keyMap.No = key.NewBinding(
 		key.WithKeys("n", "N"),
@@ -56,8 +61,8 @@ func NewQuit(com *common.Common) *Quit {
 	)
 	q.keyMap.Close = CloseKey
 	q.keyMap.Quit = key.NewBinding(
-		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", "quit"),
+		key.WithKeys(quitKey),
+		key.WithHelp(quitHelp, "quit"),
 	)
 	return q
 }

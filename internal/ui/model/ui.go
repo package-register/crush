@@ -248,13 +248,15 @@ func New(com *common.Common) *UI {
 
 	ch := NewChat(com)
 
-	keyMap := DefaultKeyMap()
+	scheme := com.Config().EffectiveKeybindingScheme()
+	keyMap := DefaultKeyMapForScheme(scheme)
 
 	// Completions component
-	comp := completions.New(
+	comp := completions.NewWithScheme(
 		com.Styles.Completions.Normal,
 		com.Styles.Completions.Focused,
 		com.Styles.Completions.Match,
+		scheme,
 	)
 
 	todoSpinner := spinner.New(
@@ -1181,6 +1183,21 @@ func (m *UI) handleDialogMsg(msg tea.Msg) tea.Cmd {
 		m.com.App.Permissions.SetSkipRequests(yolo)
 		m.setEditorPrompt(yolo)
 		m.dialog.CloseDialog(dialog.CommandsID)
+	case dialog.ActionToggleAgui:
+		cfg := m.com.Config()
+		if cfg != nil {
+			enabled := true
+			if cfg.Options != nil && cfg.Options.Agui.Enabled != nil {
+				enabled = *cfg.Options.Agui.Enabled
+			}
+			enabled = !enabled
+			cfg.Options.Agui.Enabled = &enabled
+		}
+		m.dialog.CloseDialog(dialog.CommandsID)
+	case dialog.ActionReloadMCP:
+		go mcp.Reload(context.Background(), m.com.App.Permissions, m.com.Config())
+		cmds = append(cmds, util.ReportInfo("Reloading MCP..."))
+		m.dialog.CloseDialog(dialog.CommandsID)
 	case dialog.ActionNewSession:
 		if m.isAgentBusy() {
 			cmds = append(cmds, util.ReportWarn("Agent is busy, please wait before starting a new session..."))
@@ -1575,6 +1592,15 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 			case key.Matches(msg, m.keyMap.Editor.PasteImage):
 				cmds = append(cmds, m.pasteImageFromClipboard)
 
+			// Check Newline BEFORE SendMessage: when terminal reports "shift+enter"
+			// correctly, we must match newline first. SendMessage only binds "enter".
+			case key.Matches(msg, m.keyMap.Editor.Newline):
+				m.textarea.InsertRune('\n')
+				m.closeCompletions()
+				ta, cmd := m.textarea.Update(msg)
+				m.textarea = ta
+				cmds = append(cmds, cmd)
+
 			case key.Matches(msg, m.keyMap.Editor.SendMessage):
 				value := m.textarea.Value()
 				if before, ok := strings.CutSuffix(value, "\\"); ok {
@@ -1625,12 +1651,6 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 					break
 				}
 				cmds = append(cmds, m.openEditor(m.textarea.Value()))
-			case key.Matches(msg, m.keyMap.Editor.Newline):
-				m.textarea.InsertRune('\n')
-				m.closeCompletions()
-				ta, cmd := m.textarea.Update(msg)
-				m.textarea = ta
-				cmds = append(cmds, cmd)
 			case key.Matches(msg, m.keyMap.Editor.HistoryPrev):
 				cmd := m.handleHistoryUp(msg)
 				if cmd != nil {

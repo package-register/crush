@@ -138,13 +138,21 @@ func GetState(name string) (ClientInfo, bool) {
 
 // Close closes all MCP clients. This should be called during application shutdown.
 func Close(ctx context.Context) error {
+	closeSessionsOnly(ctx)
+	broker.Shutdown()
+	return nil
+}
+
+// closeSessionsOnly closes all MCP sessions without shutting down the broker.
+// Used by Reload to allow re-initialization.
+func closeSessionsOnly(ctx context.Context) {
 	var wg sync.WaitGroup
 	for name, session := range sessions.Seq2() {
-		wg.Go(func() {
+		wg.Add(1)
+		go func(name string, session *ClientSession) {
+			defer wg.Done()
 			done := make(chan error, 1)
-			go func() {
-				done <- session.Close()
-			}()
+			go func() { done <- session.Close() }()
 			select {
 			case err := <-done:
 				if err != nil &&
@@ -155,11 +163,22 @@ func Close(ctx context.Context) error {
 				}
 			case <-ctx.Done():
 			}
-		})
+		}(name, session)
 	}
 	wg.Wait()
-	broker.Shutdown()
-	return nil
+	sessions.Reset(make(map[string]*ClientSession))
+	states.Reset(make(map[string]ClientInfo))
+}
+
+// Reload closes all MCP clients and re-initializes from the current config.
+// Use this for hot-reloading MCP configuration without restarting the app.
+func Reload(ctx context.Context, permissions permission.Service, cfg *config.Config) {
+	slog.Info("Reloading MCP clients")
+	closeSessionsOnly(ctx)
+	allTools.Reset(make(map[string][]*Tool))
+	allPrompts.Reset(make(map[string][]*Prompt))
+	allResources.Reset(make(map[string][]*Resource))
+	Initialize(ctx, permissions, cfg)
 }
 
 // Initialize initializes MCP clients based on the provided configuration.

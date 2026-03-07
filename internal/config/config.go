@@ -66,6 +66,9 @@ const (
 const (
 	AgentCoder string = "coder"
 	AgentTask  string = "task"
+	AgentGit   string = "git"
+	AgentRust  string = "rust"
+	AgentPlan  string = "plan"
 )
 
 type SelectedModel struct {
@@ -198,8 +201,9 @@ type LSPConfig struct {
 }
 
 type TUIOptions struct {
-	CompactMode bool   `json:"compact_mode,omitempty" jsonschema:"description=Enable compact mode for the TUI interface,default=false"`
-	DiffMode    string `json:"diff_mode,omitempty" jsonschema:"description=Diff mode for the TUI interface,enum=unified,enum=split"`
+	CompactMode      bool   `json:"compact_mode,omitempty" jsonschema:"description=Enable compact mode for the TUI interface,default=false"`
+	DiffMode         string `json:"diff_mode,omitempty" jsonschema:"description=Diff mode for the TUI interface,enum=unified,enum=split"`
+	KeybindingScheme string `json:"keybinding_scheme,omitempty" jsonschema:"description=Keybinding scheme: auto (detect from TERM_PROGRAM), ide (ALT-based for VS Code/Cursor), standalone (CTRL-based for independent terminal),enum=auto,enum=ide,enum=standalone,default=auto"`
 	// Here we can add themes later or any TUI related options
 	//
 
@@ -246,6 +250,8 @@ func (Attribution) JSONSchemaExtend(schema *jsonschema.Schema) {
 }
 
 type Options struct {
+	ActiveMode                string       `json:"active_mode,omitempty" jsonschema:"description=Active agent mode (coder, task, git, rust, plan, or custom from modes.toml),default=coder"`
+	ToolCallFormat            string       `json:"tool_call_format,omitempty" jsonschema:"description=Tool call format from model output: standard (API structured) or longcat (XML tags in text),default=standard"`
 	ContextPaths              []string     `json:"context_paths,omitempty" jsonschema:"description=Paths to files containing context information for the AI,example=.cursorrules,example=CRUSH.md"`
 	SkillsPaths               []string     `json:"skills_paths,omitempty" jsonschema:"description=Paths to directories containing Agent Skills (folders with SKILL.md files),example=~/.config/crush/skills,example=./skills"`
 	TUI                       *TUIOptions  `json:"tui,omitempty" jsonschema:"description=Terminal user interface options"`
@@ -261,6 +267,16 @@ type Options struct {
 	InitializeAs              string       `json:"initialize_as,omitempty" jsonschema:"description=Name of the context file to create/update during project initialization,default=AGENTS.md,example=AGENTS.md,example=CRUSH.md,example=CLAUDE.md,example=docs/LLMs.md"`
 	AutoLSP                   *bool        `json:"auto_lsp,omitempty" jsonschema:"description=Automatically setup LSPs based on root markers,default=true"`
 	Progress                  *bool        `json:"progress,omitempty" jsonschema:"description=Show indeterminate progress updates during long operations,default=true"`
+
+	Agui AguiOptions `json:"agui,omitempty" jsonschema:"description=AG-UI connectivity options"`
+}
+
+type AguiOptions struct {
+	Endpoint       string        `json:"endpoint,omitempty" jsonschema:"description=AG-UI SSE endpoint,format=uri,example=https://api.example.com/agent"`
+	APIKey         string        `json:"api_key,omitempty" jsonschema:"description=AG-UI API key or token,example=$AGUI_API_KEY"`
+	Enabled        *bool         `json:"enabled,omitempty" jsonschema:"description=Enable AG-UI tool integration,default=true"`
+	ConnectTimeout time.Duration `json:"connect_timeout,omitempty" jsonschema:"description=AG-UI connect timeout,default=30s,example=30s"`
+	ReadTimeout    time.Duration `json:"read_timeout,omitempty" jsonschema:"description=AG-UI read timeout,default=5m,example=5m"`
 }
 
 type MCPs map[string]MCPConfig
@@ -404,6 +420,28 @@ type Config struct {
 	resolver       VariableResolver
 	dataConfigDir  string             `json:"-"`
 	knownProviders []catwalk.Provider `json:"-"`
+}
+
+// EffectiveKeybindingScheme returns the keybinding scheme to use.
+// When keybinding_scheme is "auto", detects from TERM_PROGRAM (vscode -> ide).
+func (c *Config) EffectiveKeybindingScheme() string {
+	scheme := "auto"
+	if c.Options != nil && c.Options.TUI != nil && c.Options.TUI.KeybindingScheme != "" {
+		scheme = c.Options.TUI.KeybindingScheme
+	}
+	switch scheme {
+	case "ide":
+		return "ide"
+	case "standalone":
+		return "standalone"
+	case "auto":
+		if os.Getenv("TERM_PROGRAM") == "vscode" {
+			return "ide"
+		}
+		return "standalone"
+	default:
+		return "standalone"
+	}
 }
 
 func (c *Config) WorkingDir() string {
@@ -704,6 +742,7 @@ func allToolNames() []string {
 	return []string{
 		"agent",
 		"bash",
+		"agui_sse",
 		"job_output",
 		"job_kill",
 		"download",
@@ -776,7 +815,16 @@ func (c *Config) SetupAgents() {
 			AllowedMCP: map[string][]string{},
 		},
 	}
-	c.Agents = agents
+
+	// Merge built-in modes (Git, Rust, Plan)
+	for id, a := range DefaultModeConfigs() {
+		a.ContextPaths = c.Options.ContextPaths
+		a.AllowedTools = resolveAllowedTools(a.AllowedTools, c.Options.DisabledTools)
+		agents[id] = a
+	}
+
+	// Load and merge modes from TOML (modes.toml) - overrides built-in
+	c.Agents = LoadModesFromTOML(c.workingDir, agents, c.Options.DisabledTools)
 }
 
 func (c *Config) Resolver() VariableResolver {

@@ -95,12 +95,19 @@ func NewCoordinator(
 		agents:      make(map[string]SessionAgent),
 	}
 
-	agentCfg, ok := cfg.Agents[config.AgentCoder]
+	activeMode := config.AgentCoder
+	if cfg.Options != nil && cfg.Options.ActiveMode != "" {
+		activeMode = cfg.Options.ActiveMode
+	}
+	agentCfg, ok := cfg.Agents[activeMode]
 	if !ok {
-		return nil, errors.New("coder agent not configured")
+		// Fallback to coder if active mode not found
+		agentCfg, ok = cfg.Agents[config.AgentCoder]
+		if !ok {
+			return nil, errors.New("coder agent not configured")
+		}
 	}
 
-	// TODO: make this dynamic when we support multiple agents
 	prompt, err := coderPrompt(prompt.WithWorkingDir(c.cfg.WorkingDir()))
 	if err != nil {
 		return nil, err
@@ -111,7 +118,7 @@ func NewCoordinator(
 		return nil, err
 	}
 	c.currentAgent = agent
-	c.agents[config.AgentCoder] = agent
+	c.agents[activeMode] = agent
 	return c, nil
 }
 
@@ -357,17 +364,22 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 	}
 
 	largeProviderCfg, _ := c.cfg.Providers.Get(large.ModelCfg.Provider)
+	toolCallFormat := "standard"
+	if c.cfg.Options != nil && c.cfg.Options.ToolCallFormat != "" {
+		toolCallFormat = c.cfg.Options.ToolCallFormat
+	}
 	result := NewSessionAgent(SessionAgentOptions{
-		large,
-		small,
-		largeProviderCfg.SystemPromptPrefix,
-		"",
-		isSubAgent,
-		c.cfg.Options.DisableAutoSummarize,
-		c.permissions.SkipRequests(),
-		c.sessions,
-		c.messages,
-		nil,
+		LargeModel:           large,
+		SmallModel:           small,
+		SystemPromptPrefix:   largeProviderCfg.SystemPromptPrefix,
+		SystemPrompt:         "",
+		IsSubAgent:           isSubAgent,
+		DisableAutoSummarize: c.cfg.Options.DisableAutoSummarize,
+		IsYolo:               c.permissions.SkipRequests(),
+		Sessions:             c.sessions,
+		Messages:             c.messages,
+		Tools:                nil,
+		ToolCallFormat:       toolCallFormat,
 	})
 
 	c.readyWg.Go(func() error {
@@ -419,6 +431,7 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent) ([]fan
 
 	allTools = append(allTools,
 		tools.NewBashTool(c.permissions, c.cfg.WorkingDir(), c.cfg.Options.Attribution, modelName),
+		tools.NewAguiTool(c.cfg, c.permissions),
 		tools.NewJobOutputTool(),
 		tools.NewJobKillTool(),
 		tools.NewDownloadTool(c.permissions, c.cfg.WorkingDir(), nil),
@@ -870,7 +883,14 @@ func (c *coordinator) UpdateModels(ctx context.Context) error {
 	}
 	c.currentAgent.SetModels(large, small)
 
-	agentCfg, ok := c.cfg.Agents[config.AgentCoder]
+	activeMode := config.AgentCoder
+	if c.cfg.Options != nil && c.cfg.Options.ActiveMode != "" {
+		activeMode = c.cfg.Options.ActiveMode
+	}
+	agentCfg, ok := c.cfg.Agents[activeMode]
+	if !ok {
+		agentCfg, ok = c.cfg.Agents[config.AgentCoder]
+	}
 	if !ok {
 		return errors.New("coder agent not configured")
 	}

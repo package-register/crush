@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"charm.land/catwalk/pkg/catwalk"
 	"github.com/charmbracelet/crush/internal/agent/hyper"
@@ -26,6 +27,10 @@ import (
 	powernapConfig "github.com/charmbracelet/x/powernap/pkg/config"
 	"github.com/qjebbs/go-jsons"
 )
+
+func ptr[T any](v T) *T {
+	return &v
+}
 
 const defaultCatwalkURL = "https://catwalk.charm.sh"
 
@@ -78,6 +83,20 @@ func Load(workingDir, dataDir string, debug bool) (*Config, error) {
 	// Configure providers
 	valueResolver := NewShellVariableResolver(env)
 	cfg.resolver = valueResolver
+	if cfg.Options.Agui.Endpoint != "" {
+		if resolved, err := valueResolver.ResolveValue(cfg.Options.Agui.Endpoint); err == nil {
+			cfg.Options.Agui.Endpoint = resolved
+		} else {
+			slog.Error("Could not resolve AG-UI endpoint", "err", err.Error())
+		}
+	}
+	if cfg.Options.Agui.APIKey != "" {
+		if resolved, err := valueResolver.ResolveValue(cfg.Options.Agui.APIKey); err == nil {
+			cfg.Options.Agui.APIKey = resolved
+		} else {
+			slog.Error("Could not resolve AG-UI API key", "err", err.Error())
+		}
+	}
 	if err := cfg.configureProviders(env, valueResolver, cfg.knownProviders); err != nil {
 		return nil, fmt.Errorf("failed to configure providers: %w", err)
 	}
@@ -346,6 +365,15 @@ func (c *Config) setDefaults(workingDir, dataDir string) {
 	}
 	if c.Options.TUI == nil {
 		c.Options.TUI = &TUIOptions{}
+	}
+	if c.Options.Agui.Enabled == nil {
+		c.Options.Agui.Enabled = ptr(true)
+	}
+	if c.Options.Agui.ConnectTimeout == 0 {
+		c.Options.Agui.ConnectTimeout = 30 * time.Second
+	}
+	if c.Options.Agui.ReadTimeout == 0 {
+		c.Options.Agui.ReadTimeout = 5 * time.Minute
 	}
 	if dataDir != "" {
 		c.Options.DataDirectory = dataDir

@@ -596,7 +596,7 @@ func DefaultStyles() Styles {
 		},
 		Cursor: textinput.CursorStyle{
 			Color: secondary,
-			Shape: tea.CursorBlock,
+			Shape: tea.CursorBar,
 			Blink: true,
 		},
 	}
@@ -622,7 +622,7 @@ func DefaultStyles() Styles {
 		},
 		Cursor: textarea.CursorStyle{
 			Color: secondary,
-			Shape: tea.CursorBlock,
+			Shape: tea.CursorBar,
 			Blink: true,
 		},
 	}

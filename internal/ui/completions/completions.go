@@ -60,14 +60,19 @@ type Completions struct {
 	matchStyle   lipgloss.Style
 }
 
-// New creates a new completions component.
+// New creates a new completions component with standalone keymap.
 func New(normalStyle, focusedStyle, matchStyle lipgloss.Style) *Completions {
+	return NewWithScheme(normalStyle, focusedStyle, matchStyle, "standalone")
+}
+
+// NewWithScheme creates a new completions component with keymap for the given scheme.
+func NewWithScheme(normalStyle, focusedStyle, matchStyle lipgloss.Style, scheme string) *Completions {
 	l := list.NewFilterableList()
 	l.SetGap(0)
 	l.SetReverse(true)
 
 	return &Completions{
-		keyMap:       DefaultKeyMap(),
+		keyMap:       DefaultKeyMapForScheme(scheme),
 		list:         l,
 		normalStyle:  normalStyle,
 		focusedStyle: focusedStyle,

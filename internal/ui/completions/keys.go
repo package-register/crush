@@ -14,8 +14,29 @@ type KeyMap struct {
 	UpInsert key.Binding
 }
 
-// DefaultKeyMap returns the default key bindings for completions.
+// DefaultKeyMap returns the default (standalone) key bindings for completions.
 func DefaultKeyMap() KeyMap {
+	return defaultKeyMapForScheme("standalone")
+}
+
+// DefaultKeyMapForScheme returns key bindings for the given scheme.
+func DefaultKeyMapForScheme(scheme string) KeyMap {
+	return defaultKeyMapForScheme(scheme)
+}
+
+func defaultKeyMapForScheme(scheme string) KeyMap {
+	mod := "ctrl"
+	if scheme == "ide" {
+		mod = "alt"
+	}
+	downInsKeys := mod + "+n"
+	upInsKeys := mod + "+p"
+	var selKeys []string
+	if scheme == "ide" {
+		selKeys = []string{"enter", "tab", "alt+y"}
+	} else {
+		selKeys = []string{"enter", "tab", "ctrl+y"}
+	}
 	return KeyMap{
 		Down: key.NewBinding(
 			key.WithKeys("down"),
@@ -26,7 +47,7 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("up", "move up"),
 		),
 		Select: key.NewBinding(
-			key.WithKeys("enter", "tab", "ctrl+y"),
+			key.WithKeys(selKeys...),
 			key.WithHelp("enter", "select"),
 		),
 		Cancel: key.NewBinding(
@@ -34,12 +55,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("esc", "cancel"),
 		),
 		DownInsert: key.NewBinding(
-			key.WithKeys("ctrl+n"),
-			key.WithHelp("ctrl+n", "insert next"),
+			key.WithKeys(downInsKeys),
+			key.WithHelp(downInsKeys, "insert next"),
 		),
 		UpInsert: key.NewBinding(
-			key.WithKeys("ctrl+p"),
-			key.WithHelp("ctrl+p", "insert previous"),
+			key.WithKeys(upInsKeys),
+			key.WithHelp(upInsKeys, "insert previous"),
 		),
 	}
 }
