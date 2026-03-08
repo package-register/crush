@@ -1198,17 +1198,6 @@ func (m *UI) handleDialogMsg(msg tea.Msg) tea.Cmd {
 		m.com.App.Permissions.SetSkipRequests(yolo)
 		m.setEditorPrompt(yolo)
 		m.dialog.CloseDialog(dialog.CommandsID)
-	case dialog.ActionToggleAgui:
-		cfg := m.com.Config()
-		if cfg != nil {
-			enabled := true
-			if cfg.Options != nil && cfg.Options.Agui.Enabled != nil {
-				enabled = *cfg.Options.Agui.Enabled
-			}
-			enabled = !enabled
-			cfg.Options.Agui.Enabled = &enabled
-		}
-		m.dialog.CloseDialog(dialog.CommandsID)
 	case dialog.ActionReloadMCP:
 		go mcp.Reload(context.Background(), m.com.App.Permissions, m.com.Config())
 		cmds = append(cmds, util.ReportInfo("Reloading MCP..."))

@@ -456,21 +456,11 @@ func (c *Commands) defaultCommands() []*CommandItem {
 		commands = append(commands, NewCommandItem(c.com.Styles, "toggle_pills", label, "ctrl+t", ActionTogglePills{}))
 	}
 
-	enabled := true
-	if cfg.Options != nil && cfg.Options.Agui.Enabled != nil {
-		enabled = *cfg.Options.Agui.Enabled
-	}
-	status := "Enable AG-UI"
-	if enabled {
-		status = "Disable AG-UI"
-	}
-
 	if len(cfg.MCP) > 0 {
 		commands = append(commands, NewCommandItem(c.com.Styles, "reload_mcp", "Reload MCP", "", ActionReloadMCP{}))
 	}
 	commands = append(commands,
 		NewCommandItem(c.com.Styles, "toggle_yolo", "Toggle Yolo Mode", "", ActionToggleYoloMode{}),
-		NewCommandItem(c.com.Styles, "toggle_agui", status, "", ActionToggleAgui{}),
 		NewCommandItem(c.com.Styles, "toggle_help", "Toggle Help", "ctrl+g", ActionToggleHelp{}),
 		NewCommandItem(c.com.Styles, "init", "Initialize Project", "", ActionInitializeProject{}),
 		NewCommandItem(c.com.Styles, "quit", "Quit", "ctrl+c", tea.QuitMsg{}, "exit"),

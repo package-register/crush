@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/crush/internal/agent"
 	"github.com/charmbracelet/crush/internal/agent/tools/mcp"
+	"github.com/charmbracelet/crush/internal/agui-server"
 	"github.com/charmbracelet/crush/internal/config"
 	"github.com/charmbracelet/crush/internal/db"
 	"github.com/charmbracelet/crush/internal/event"
@@ -60,6 +62,8 @@ type App struct {
 
 	LSPManager *lsp.Manager
 
+	AguiServer aguiserver.Server
+
 	config *config.Config
 
 	serviceEventsWG *sync.WaitGroup
@@ -99,6 +103,25 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 		events:          make(chan tea.Msg, 100),
 		serviceEventsWG: &sync.WaitGroup{},
 		tuiWG:           &sync.WaitGroup{},
+	}
+
+	// Initialize AG-UI server if enabled
+	if cfg.Options != nil && cfg.Options.AguiServer != nil && cfg.Options.AguiServer.IsEnabled() {
+		serverCfg := aguiserver.ServerConfig{
+			Port:        cfg.Options.AguiServer.GetPort(),
+			BasePath:    cfg.Options.AguiServer.GetBasePath(),
+			CORSOrigins: cfg.Options.AguiServer.GetCORSOrigins(),
+		}
+		app.AguiServer = aguiserver.NewServer(serverCfg)
+		app.cleanupFuncs = append(app.cleanupFuncs, func(ctx context.Context) error {
+			return app.AguiServer.Stop(ctx)
+		})
+		// Start AG-UI server in background
+		go func() {
+			if err := app.AguiServer.Start(ctx); err != nil && err != http.ErrServerClosed {
+				slog.Error("AG-UI server error", "error", err)
+			}
+		}()
 	}
 
 	app.setupEvents()

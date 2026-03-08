@@ -51,7 +51,6 @@ type (
 	ActionTogglePills       struct{}
 	ActionExternalEditor    struct{}
 	ActionToggleYoloMode    struct{}
-	ActionToggleAgui        struct{}
 	ActionReloadMCP         struct{}
 	// ActionInitializeProject is a message to initialize a project.
 	ActionInitializeProject struct{}

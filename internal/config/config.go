@@ -267,16 +267,19 @@ type Options struct {
 	InitializeAs              string       `json:"initialize_as,omitempty" jsonschema:"description=Name of the context file to create/update during project initialization,default=AGENTS.md,example=AGENTS.md,example=CRUSH.md,example=CLAUDE.md,example=docs/LLMs.md"`
 	AutoLSP                   *bool        `json:"auto_lsp,omitempty" jsonschema:"description=Automatically setup LSPs based on root markers,default=true"`
 	Progress                  *bool        `json:"progress,omitempty" jsonschema:"description=Show indeterminate progress updates during long operations,default=true"`
-
-	Agui AguiOptions `json:"agui,omitempty" jsonschema:"description=AG-UI connectivity options"`
+	AguiServer                *AguiServerOptions `json:"agui_server,omitempty" jsonschema:"description=AG-UI server configuration options"`
 }
 
-type AguiOptions struct {
-	Endpoint       string        `json:"endpoint,omitempty" jsonschema:"description=AG-UI SSE endpoint,format=uri,example=https://api.example.com/agent"`
-	APIKey         string        `json:"api_key,omitempty" jsonschema:"description=AG-UI API key or token,example=$AGUI_API_KEY"`
-	Enabled        *bool         `json:"enabled,omitempty" jsonschema:"description=Enable AG-UI tool integration,default=true"`
-	ConnectTimeout time.Duration `json:"connect_timeout,omitempty" jsonschema:"description=AG-UI connect timeout,default=30s,example=30s"`
-	ReadTimeout    time.Duration `json:"read_timeout,omitempty" jsonschema:"description=AG-UI read timeout,default=5m,example=5m"`
+// AguiServerOptions holds the configuration for the AG-UI server.
+type AguiServerOptions struct {
+	// Enabled indicates whether the AG-UI server is enabled.
+	Enabled *bool `json:"enabled,omitempty" jsonschema:"description=Whether the AG-UI server is enabled,default=false"`
+	// Port is the port the AG-UI server listens on.
+	Port int `json:"port,omitempty" jsonschema:"description=Port the AG-UI server listens on,default=8080,minimum=1,maximum=65535"`
+	// BasePath is the base path for AG-UI server endpoints.
+	BasePath string `json:"base_path,omitempty" jsonschema:"description=Base path for AG-UI server endpoints,default=/agui,format=uri-path"`
+	// CORSOrigins is a list of allowed CORS origins.
+	CORSOrigins []string `json:"cors_origins,omitempty" jsonschema:"description=List of allowed CORS origins for the AG-UI server"`
 }
 
 type MCPs map[string]MCPConfig
@@ -742,7 +745,6 @@ func allToolNames() []string {
 	return []string{
 		"agent",
 		"bash",
-		"agui_sse",
 		"job_output",
 		"job_kill",
 		"download",
@@ -938,4 +940,55 @@ func ptrValOr[T any](t *T, el T) T {
 		return el
 	}
 	return *t
+}
+
+// Validate validates the AG-UI server configuration.
+func (o *AguiServerOptions) Validate() error {
+	if o == nil {
+		return nil
+	}
+
+	if o.Port < 0 || o.Port > 65535 {
+		return fmt.Errorf("invalid port %d: must be between 0 and 65535", o.Port)
+	}
+
+	if o.BasePath != "" {
+		if !strings.HasPrefix(o.BasePath, "/") {
+			return fmt.Errorf("invalid base_path %q: must start with /", o.BasePath)
+		}
+	}
+
+	return nil
+}
+
+// IsEnabled returns true if the AG-UI server is enabled.
+func (o *AguiServerOptions) IsEnabled() bool {
+	if o == nil {
+		return false
+	}
+	return ptrValOr(o.Enabled, false)
+}
+
+// GetPort returns the configured port or the default value.
+func (o *AguiServerOptions) GetPort() int {
+	if o == nil {
+		return 8080
+	}
+	return cmp.Or(o.Port, 8080)
+}
+
+// GetBasePath returns the configured base path or the default value.
+func (o *AguiServerOptions) GetBasePath() string {
+	if o == nil {
+		return "/agui"
+	}
+	return cmp.Or(o.BasePath, "/agui")
+}
+
+// GetCORSOrigins returns the configured CORS origins.
+func (o *AguiServerOptions) GetCORSOrigins() []string {
+	if o == nil {
+		return nil
+	}
+	return o.CORSOrigins
 }
