@@ -196,6 +196,8 @@ type RequestTracker struct {
 	mu       sync.Map // map[string]time.Time
 	timeout  time.Duration
 	cleanupT time.Duration
+	done     chan struct{}
+	wg       sync.WaitGroup
 }
 
 // NewRequestTracker creates a new request tracker.
@@ -205,7 +207,9 @@ func NewRequestTracker(timeout, cleanupInterval time.Duration) *RequestTracker {
 	rt := &RequestTracker{
 		timeout:  timeout,
 		cleanupT: cleanupInterval,
+		done:     make(chan struct{}),
 	}
+	rt.wg.Add(1)
 	go rt.cleanupLoop()
 	return rt
 }
@@ -239,6 +243,8 @@ func (rt *RequestTracker) Remove(requestID string) {
 
 // cleanupLoop periodically removes expired request IDs.
 func (rt *RequestTracker) cleanupLoop() {
+	defer rt.wg.Done()
+	
 	// Handle zero or negative cleanup interval
 	if rt.cleanupT <= 0 {
 		return
@@ -247,15 +253,28 @@ func (rt *RequestTracker) cleanupLoop() {
 	ticker := time.NewTicker(rt.cleanupT)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		now := time.Now()
-		rt.mu.Range(func(key, value any) bool {
-			timestamp := value.(time.Time)
-			if now.Sub(timestamp) > rt.timeout {
-				rt.mu.Delete(key)
-			}
-			return true
-		})
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			rt.mu.Range(func(key, value any) bool {
+				timestamp := value.(time.Time)
+				if now.Sub(timestamp) > rt.timeout {
+					rt.mu.Delete(key)
+				}
+				return true
+			})
+		case <-rt.done:
+			return
+		}
+	}
+}
+
+// Close stops the background cleanup goroutine.
+func (rt *RequestTracker) Close() {
+	if rt.done != nil {
+		close(rt.done)
+		rt.wg.Wait()
 	}
 }
 

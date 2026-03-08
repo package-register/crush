@@ -44,6 +44,7 @@ func TestAppAguiServerInitialization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create app: %v", err)
 	}
+	defer app.Shutdown()
 
 	if app.AguiServer == nil {
 		t.Fatal("Expected AguiServer to be initialized")
@@ -53,9 +54,6 @@ func TestAppAguiServerInitialization(t *testing.T) {
 	if len(app.cleanupFuncs) == 0 {
 		t.Fatal("Expected cleanup functions to be added")
 	}
-
-	// Test shutdown
-	app.Shutdown()
 }
 
 // TestAppAguiServerDisabled tests that the AG-UI server is not initialized
@@ -88,12 +86,11 @@ func TestAppAguiServerDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create app: %v", err)
 	}
+	defer app.Shutdown()
 
 	if app.AguiServer != nil {
 		t.Fatal("Expected AguiServer to be nil when disabled")
 	}
-
-	app.Shutdown()
 }
 
 // TestAppAguiServerNilConfig tests that the app handles nil AG-UI server
@@ -121,12 +118,11 @@ func TestAppAguiServerNilConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create app: %v", err)
 	}
+	defer app.Shutdown()
 
 	if app.AguiServer != nil {
 		t.Fatal("Expected AguiServer to be nil when not configured")
 	}
-
-	app.Shutdown()
 }
 
 // TestAguiServerStop tests that the AG-UI server can be stopped gracefully.

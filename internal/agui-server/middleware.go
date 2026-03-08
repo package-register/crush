@@ -29,6 +29,8 @@ func DefaultRateLimitConfig() RateLimitConfig {
 
 // RateLimitMiddleware creates a middleware that applies rate limiting.
 // It enforces both global and session-level rate limits.
+// Note: The middleware creates a RequestTracker with a background goroutine.
+// For long-running servers, consider using NewRateLimitMiddlewareWithCleanup.
 func RateLimitMiddleware(config RateLimitConfig) func(http.Handler) http.Handler {
 	globalLimiter := NewTokenBucket(config.GlobalBurst, config.GlobalQPS)
 	sessionLimiters := NewRateLimiter(config.SessionQPS, config.SessionBurst)
@@ -72,6 +74,50 @@ func RateLimitMiddleware(config RateLimitConfig) func(http.Handler) http.Handler
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// RateLimitMiddlewareWithCleanup creates a rate limiting middleware with cleanup support.
+// Call the returned cleanup function to release resources when the middleware is no longer needed.
+func RateLimitMiddlewareWithCleanup(config RateLimitConfig) (func(http.Handler) http.Handler, func()) {
+	globalLimiter := NewTokenBucket(config.GlobalBurst, config.GlobalQPS)
+	sessionLimiters := NewRateLimiter(config.SessionQPS, config.SessionBurst)
+	requestTracker := NewRequestTracker(config.RequestTimeout, config.RequestTimeout/2)
+
+	middleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			sessionID := extractSessionID(r)
+
+			if !globalLimiter.Allow() {
+				writeRateLimitError(w, "global", int(config.GlobalQPS), 1*time.Second)
+				return
+			}
+
+			if sessionID != "" {
+				if !sessionLimiters.Allow(sessionID) {
+					writeRateLimitError(w, "session", int(config.SessionQPS), 1*time.Second)
+					return
+				}
+			}
+
+			requestID := extractRequestID(r)
+			if requestID != "" {
+				if !requestTracker.Track(requestID) {
+					writeDuplicateRequestError(w, requestID)
+					return
+				}
+			}
+
+			w = &rateLimitResponseWriter{
+				ResponseWriter: w,
+				limit:          int(config.GlobalQPS),
+				remaining:      int(globalLimiter.Tokens()),
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	return middleware, requestTracker.Close
 }
 
 // extractSessionID extracts the session ID from the request.

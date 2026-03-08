@@ -72,6 +72,9 @@ func (s *server) Stop(ctx context.Context) error {
 	s.httpServer = nil
 	s.mu.Unlock()
 
+	// Stop request tracker to prevent goroutine leak
+	s.requestTracker.Close()
+
 	return hs.Shutdown(ctx)
 }
 

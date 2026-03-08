@@ -225,6 +225,7 @@ func TestRateLimiter_Cleanup(t *testing.T) {
 
 func TestRequestTracker_Track(t *testing.T) {
 	tracker := NewRequestTracker(100*time.Millisecond, 50*time.Millisecond)
+	defer tracker.Close()
 
 	requestID := "test-request-1"
 
@@ -249,6 +250,7 @@ func TestRequestTracker_Track(t *testing.T) {
 
 func TestRequestTracker_EmptyID(t *testing.T) {
 	tracker := NewRequestTracker(100*time.Millisecond, 50*time.Millisecond)
+	defer tracker.Close()
 
 	// Empty request ID should always be allowed
 	if !tracker.Track("") {
@@ -261,6 +263,7 @@ func TestRequestTracker_EmptyID(t *testing.T) {
 
 func TestRequestTracker_Concurrent(t *testing.T) {
 	tracker := NewRequestTracker(1*time.Second, 500*time.Millisecond)
+	defer tracker.Close()
 
 	requestID := "concurrent-request"
 
@@ -294,6 +297,7 @@ func TestRequestTracker_Concurrent(t *testing.T) {
 
 func TestRequestTracker_MultipleIDs(t *testing.T) {
 	tracker := NewRequestTracker(1*time.Second, 500*time.Millisecond)
+	defer tracker.Close()
 
 	// Different request IDs should be tracked independently
 	if !tracker.Track("request-1") {
@@ -317,6 +321,7 @@ func TestRequestTracker_MultipleIDs(t *testing.T) {
 
 func TestRequestTracker_Remove(t *testing.T) {
 	tracker := NewRequestTracker(1*time.Second, 500*time.Millisecond)
+	defer tracker.Close()
 
 	requestID := "test-request"
 
@@ -378,6 +383,7 @@ func BenchmarkRateLimiter_MultipleKeys(b *testing.B) {
 
 func BenchmarkRequestTracker_Track(b *testing.B) {
 	tracker := NewRequestTracker(1*time.Second, 500*time.Millisecond)
+	defer tracker.Close()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -388,6 +394,7 @@ func BenchmarkRequestTracker_Track(b *testing.B) {
 
 func BenchmarkRequestTracker_Concurrent(b *testing.B) {
 	tracker := NewRequestTracker(1*time.Second, 500*time.Millisecond)
+	defer tracker.Close()
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
