@@ -1,0 +1,53 @@
+name: Simple Release
+
+on:
+  push:
+    tags:
+      - v*.*.*
+
+jobs:
+  build:
+    name: Build Release Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Build for Linux
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o crush-linux-amd64 -trimpath -ldflags="-s -w" .
+          tar -czf crush-linux-amd64.tar.gz crush-linux-amd64 README.md LICENSE
+
+      - name: Build for macOS
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -o crush-darwin-amd64 -trimpath -ldflags="-s -w" .
+          tar -czf crush-darwin-amd64.tar.gz crush-darwin-amd64 README.md LICENSE
+          
+          GOOS=darwin GOARCH=arm64 go build -o crush-darwin-arm64 -trimpath -ldflags="-s -w" .
+          tar -czf crush-darwin-arm64.tar.gz crush-darwin-arm64 README.md LICENSE
+
+      - name: Build for Windows
+        run: |
+          GOOS=windows GOARCH=amd64 go build -o crush-windows-amd64.exe -trimpath -ldflags="-s -w" .
+          zip crush-windows-amd64.zip crush-windows-amd64.exe README.md LICENSE
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            crush-linux-amd64.tar.gz
+            crush-darwin-amd64.tar.gz
+            crush-darwin-arm64.tar.gz
+            crush-windows-amd64.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
