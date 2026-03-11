@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/crush/internal/message"
-	"github.com/charmbracelet/crush/internal/ui/anim"
 	"github.com/charmbracelet/crush/internal/ui/common"
 	"github.com/charmbracelet/crush/internal/ui/styles"
 	"github.com/charmbracelet/x/ansi"
@@ -30,7 +30,7 @@ type AssistantMessageItem struct {
 
 	message           *message.Message
 	sty               *styles.Styles
-	anim              *anim.Anim
+	spinner           spinner.Model
 	thinkingExpanded  bool
 	thinkingBoxHeight int // Tracks the rendered thinking box height for click detection.
 }
@@ -45,14 +45,10 @@ func NewAssistantMessageItem(sty *styles.Styles, message *message.Message) Messa
 		sty:                      sty,
 	}
 
-	a.anim = anim.New(anim.Settings{
-		ID:          a.ID(),
-		Size:        15,
-		GradColorA:  sty.Primary,
-		GradColorB:  sty.Secondary,
-		LabelColor:  sty.FgBase,
-		CycleColors: true,
-	})
+	a.spinner = spinner.New(
+		spinner.WithSpinner(spinner.Dot),
+		spinner.WithStyle(sty.Base.Foreground(sty.Primary)),
+	)
 	return a
 }
 
@@ -61,15 +57,26 @@ func (a *AssistantMessageItem) StartAnimation() tea.Cmd {
 	if !a.isSpinning() {
 		return nil
 	}
-	return a.anim.Start()
+	return a.spinner.Tick
 }
 
 // Animate progresses the assistant message animation if it should be spinning.
-func (a *AssistantMessageItem) Animate(msg anim.StepMsg) tea.Cmd {
+func (a *AssistantMessageItem) Animate(msg tea.Msg) tea.Cmd {
 	if !a.isSpinning() {
 		return nil
 	}
-	return a.anim.Animate(msg)
+	tickMsg, ok := msg.(spinner.TickMsg)
+	if !ok {
+		return nil
+	}
+	var cmd tea.Cmd
+	a.spinner, cmd = a.spinner.Update(tickMsg)
+	return cmd
+}
+
+// SpinnerID implements Animatable.
+func (a *AssistantMessageItem) SpinnerID() int {
+	return a.spinner.ID()
 }
 
 // ID implements MessageItem.
@@ -211,12 +218,11 @@ func (a *AssistantMessageItem) renderMarkdown(content string, width int) string 
 }
 
 func (a *AssistantMessageItem) renderSpinning() string {
-	if a.message.IsThinking() {
-		a.anim.SetLabel("Thinking")
-	} else if a.message.IsSummaryMessage {
-		a.anim.SetLabel("Summarizing")
+	label := "Thinking"
+	if a.message.IsSummaryMessage {
+		label = "Summarizing"
 	}
-	return a.anim.Render()
+	return a.spinner.View() + " " + label
 }
 
 // renderError renders an error message.

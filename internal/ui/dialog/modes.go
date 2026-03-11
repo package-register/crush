@@ -15,8 +15,8 @@ import (
 
 const (
 	// ModesID is the identifier for the agent mode selection dialog.
-	ModesID               = "modes"
-	modesDialogMaxWidth   = 55
+	ModesID              = "modes"
+	modesDialogMaxWidth  = 55
 	modesDialogMaxHeight = 12
 )
 

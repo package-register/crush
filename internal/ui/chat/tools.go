@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/tree"
@@ -16,7 +17,6 @@ import (
 	"github.com/charmbracelet/crush/internal/fsext"
 	"github.com/charmbracelet/crush/internal/message"
 	"github.com/charmbracelet/crush/internal/stringext"
-	"github.com/charmbracelet/crush/internal/ui/anim"
 	"github.com/charmbracelet/crush/internal/ui/common"
 	"github.com/charmbracelet/crush/internal/ui/styles"
 	"github.com/charmbracelet/x/ansi"
@@ -91,7 +91,7 @@ func (d *DefaultToolRenderContext) RenderTool(sty *styles.Styles, width int, opt
 type ToolRenderOpts struct {
 	ToolCall        message.ToolCall
 	Result          *message.ToolResult
-	Anim            *anim.Anim
+	Spinner         *spinner.Model
 	ExpandedContent bool
 	Compact         bool
 	IsSpinning      bool
@@ -153,7 +153,7 @@ type baseToolMessageItem struct {
 	spinningFunc SpinningFunc
 
 	sty             *styles.Styles
-	anim            *anim.Anim
+	spinner         spinner.Model
 	expandedContent bool
 }
 
@@ -186,14 +186,10 @@ func newBaseToolMessageItem(
 		status:                   status,
 		hasCappedWidth:           hasCappedWidth,
 	}
-	t.anim = anim.New(anim.Settings{
-		ID:          toolCall.ID,
-		Size:        15,
-		GradColorA:  sty.Primary,
-		GradColorB:  sty.Secondary,
-		LabelColor:  sty.FgBase,
-		CycleColors: true,
-	})
+	t.spinner = spinner.New(
+		spinner.WithSpinner(spinner.Dot),
+		spinner.WithStyle(sty.Base.Foreground(sty.Primary)),
+	)
 
 	return t
 }
@@ -281,15 +277,26 @@ func (t *baseToolMessageItem) StartAnimation() tea.Cmd {
 	if !t.isSpinning() {
 		return nil
 	}
-	return t.anim.Start()
+	return t.spinner.Tick
 }
 
 // Animate progresses the assistant message animation if it should be spinning.
-func (t *baseToolMessageItem) Animate(msg anim.StepMsg) tea.Cmd {
+func (t *baseToolMessageItem) Animate(msg tea.Msg) tea.Cmd {
 	if !t.isSpinning() {
 		return nil
 	}
-	return t.anim.Animate(msg)
+	tickMsg, ok := msg.(spinner.TickMsg)
+	if !ok {
+		return nil
+	}
+	var cmd tea.Cmd
+	t.spinner, cmd = t.spinner.Update(tickMsg)
+	return cmd
+}
+
+// SpinnerID implements Animatable.
+func (t *baseToolMessageItem) SpinnerID() int {
+	return t.spinner.ID()
 }
 
 // RawRender implements [MessageItem].
@@ -305,7 +312,7 @@ func (t *baseToolMessageItem) RawRender(width int) string {
 		content = t.toolRenderer.RenderTool(t.sty, toolItemWidth, &ToolRenderOpts{
 			ToolCall:        t.toolCall,
 			Result:          t.result,
-			Anim:            t.anim,
+			Spinner:         &t.spinner,
 			ExpandedContent: t.expandedContent,
 			Compact:         t.isCompact,
 			IsSpinning:      t.isSpinning(),
@@ -424,13 +431,13 @@ func (t *baseToolMessageItem) HandleKeyEvent(key tea.KeyMsg) (bool, tea.Cmd) {
 }
 
 // pendingTool renders a tool that is still in progress with an animation.
-func pendingTool(sty *styles.Styles, name string, anim *anim.Anim) string {
+func pendingTool(sty *styles.Styles, name string, s *spinner.Model) string {
 	icon := sty.Tool.IconPending.Render()
 	toolName := sty.Tool.NameNormal.Render(name)
 
 	var animView string
-	if anim != nil {
-		animView = anim.Render()
+	if s != nil {
+		animView = s.View()
 	}
 
 	return fmt.Sprintf("%s %s %s", icon, toolName, animView)

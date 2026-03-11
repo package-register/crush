@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/tree"
 	"github.com/charmbracelet/crush/internal/agent"
 	"github.com/charmbracelet/crush/internal/message"
-	"github.com/charmbracelet/crush/internal/ui/anim"
 	"github.com/charmbracelet/crush/internal/ui/styles"
 )
 
@@ -53,19 +53,20 @@ func NewAgentToolMessageItem(
 }
 
 // Animate progresses the message animation if it should be spinning.
-func (a *AgentToolMessageItem) Animate(msg anim.StepMsg) tea.Cmd {
+func (a *AgentToolMessageItem) Animate(msg tea.Msg) tea.Cmd {
 	if a.result != nil || a.Status() == ToolStatusCanceled {
 		return nil
 	}
-	if msg.ID == a.ID() {
-		return a.anim.Animate(msg)
+	tickMsg, ok := msg.(spinner.TickMsg)
+	if !ok {
+		return nil
+	}
+	if tickMsg.ID == a.spinner.ID() {
+		return a.baseToolMessageItem.Animate(msg)
 	}
 	for _, nestedTool := range a.nestedTools {
-		if msg.ID != nestedTool.ID() {
-			continue
-		}
-		if s, ok := nestedTool.(Animatable); ok {
-			return s.Animate(msg)
+		if animatable, ok := nestedTool.(Animatable); ok && animatable.SpinnerID() == tickMsg.ID {
+			return animatable.Animate(msg)
 		}
 	}
 	return nil
@@ -101,7 +102,7 @@ type AgentToolRenderContext struct {
 func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
 	if !opts.ToolCall.Finished && !opts.IsCanceled() && len(r.agent.nestedTools) == 0 {
-		return pendingTool(sty, "Agent", opts.Anim)
+		return pendingTool(sty, "Agent", opts.Spinner)
 	}
 
 	var params agent.AgentParams
@@ -149,8 +150,8 @@ func (r *AgentToolRenderContext) RenderTool(sty *styles.Styles, width int, opts 
 	parts = append(parts, childTools.Enumerator(roundedEnumerator(2, taskTagWidth-5)).String())
 
 	// Show animation if still running.
-	if !opts.HasResult() && !opts.IsCanceled() {
-		parts = append(parts, "", opts.Anim.Render())
+	if !opts.HasResult() && !opts.IsCanceled() && opts.Spinner != nil {
+		parts = append(parts, "", opts.Spinner.View())
 	}
 
 	result := lipgloss.JoinVertical(lipgloss.Left, parts...)
@@ -232,7 +233,7 @@ type agenticFetchParams struct {
 func (r *AgenticFetchToolRenderContext) RenderTool(sty *styles.Styles, width int, opts *ToolRenderOpts) string {
 	cappedWidth := cappedMessageWidth(width)
 	if !opts.ToolCall.Finished && !opts.IsCanceled() && len(r.fetch.nestedTools) == 0 {
-		return pendingTool(sty, "Agentic Fetch", opts.Anim)
+		return pendingTool(sty, "Agentic Fetch", opts.Spinner)
 	}
 
 	var params agenticFetchParams
@@ -286,8 +287,8 @@ func (r *AgenticFetchToolRenderContext) RenderTool(sty *styles.Styles, width int
 	parts = append(parts, childTools.Enumerator(roundedEnumerator(2, promptTagWidth-5)).String())
 
 	// Show animation if still running.
-	if !opts.HasResult() && !opts.IsCanceled() {
-		parts = append(parts, "", opts.Anim.Render())
+	if !opts.HasResult() && !opts.IsCanceled() && opts.Spinner != nil {
+		parts = append(parts, "", opts.Spinner.View())
 	}
 
 	result := lipgloss.JoinVertical(lipgloss.Left, parts...)

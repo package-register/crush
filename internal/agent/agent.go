@@ -133,7 +133,7 @@ type SessionAgentOptions struct {
 	Tools                []fantasy.AgentTool
 	// ToolCallFormat: "standard" (default) or "longcat" for <longcat_tool_call> in text
 	ToolCallFormat string
-	Notify               pubsub.Publisher[notify.Notification]
+	Notify         pubsub.Publisher[notify.Notification]
 }
 
 func NewSessionAgent(

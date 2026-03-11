@@ -11,7 +11,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/crush/internal/config"
 	"github.com/charmbracelet/crush/internal/message"
-	"github.com/charmbracelet/crush/internal/ui/anim"
 	"github.com/charmbracelet/crush/internal/ui/attachments"
 	"github.com/charmbracelet/crush/internal/ui/common"
 	"github.com/charmbracelet/crush/internal/ui/list"
@@ -33,7 +32,9 @@ type Identifiable interface {
 // Animatable is an interface for items that support animation.
 type Animatable interface {
 	StartAnimation() tea.Cmd
-	Animate(msg anim.StepMsg) tea.Cmd
+	Animate(msg tea.Msg) tea.Cmd
+	// SpinnerID returns the spinner's ID for routing TickMsg. Returns 0 if no spinner.
+	SpinnerID() int
 }
 
 // Expandable is an interface for items that can be expanded or collapsed.

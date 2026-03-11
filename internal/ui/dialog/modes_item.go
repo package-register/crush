@@ -9,11 +9,11 @@ import (
 
 // ModeItem wraps an agent mode for the modes selection list.
 type ModeItem struct {
-	modeID string
-	agent  config.Agent
-	t      *styles.Styles
-	m      fuzzy.Match
-	cache  map[int]string
+	modeID  string
+	agent   config.Agent
+	t       *styles.Styles
+	m       fuzzy.Match
+	cache   map[int]string
 	focused bool
 }
 
