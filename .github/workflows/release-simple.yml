@@ -7,45 +7,84 @@ on:
 
 jobs:
   build:
-    name: Build Release Binaries
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            artifact: crush-linux-amd64.tar.gz
+            binary: crush-linux-amd64
+          - goos: darwin
+            goarch: amd64
+            artifact: crush-darwin-amd64.tar.gz
+            binary: crush-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            artifact: crush-darwin-arm64.tar.gz
+            binary: crush-darwin-arm64
+          - goos: windows
+            goarch: amd64
+            artifact: crush-windows-amd64.zip
+            binary: crush-windows-amd64.exe
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: "1.26"
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
-      - name: Build for Linux
-        run: |
-          GOOS=linux GOARCH=amd64 go build -o crush-linux-amd64 -trimpath -ldflags="-s -w" .
-          tar -czf crush-linux-amd64.tar.gz crush-linux-amd64 README.md
+      - name: Set version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Build for macOS
+      - name: Build
         run: |
-          GOOS=darwin GOARCH=amd64 go build -o crush-darwin-amd64 -trimpath -ldflags="-s -w" .
-          tar -czf crush-darwin-amd64.tar.gz crush-darwin-amd64 README.md
-          
-          GOOS=darwin GOARCH=arm64 go build -o crush-darwin-arm64 -trimpath -ldflags="-s -w" .
-          tar -czf crush-darwin-arm64.tar.gz crush-darwin-arm64 README.md
+          VERSION="${{ steps.version.outputs.version }}"
+          REPO="${{ github.repository }}"
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.binary }} -trimpath \
+            -ldflags="-s -w -X github.com/charmbracelet/crush/internal/version.Version=${VERSION} -X github.com/charmbracelet/crush/internal/update.GitHubRepo=${REPO}" .
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            zip ${{ matrix.artifact }} ${{ matrix.binary }} README.md
+          else
+            tar -czf ${{ matrix.artifact }} ${{ matrix.binary }} README.md
+          fi
 
-      - name: Build for Windows
-        run: |
-          GOOS=windows GOARCH=amd64 go build -o crush-windows-amd64.exe -trimpath -ldflags="-s -w" .
-          zip crush-windows-amd64.zip crush-windows-amd64.exe README.md
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: release-artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            crush-linux-amd64.tar.gz
-            crush-darwin-amd64.tar.gz
-            crush-darwin-arm64.tar.gz
-            crush-windows-amd64.zip
+            release-artifacts/linux-amd64/crush-linux-amd64.tar.gz
+            release-artifacts/darwin-amd64/crush-darwin-amd64.tar.gz
+            release-artifacts/darwin-arm64/crush-darwin-arm64.tar.gz
+            release-artifacts/windows-amd64/crush-windows-amd64.zip
           generate_release_notes: true
           draft: false
           prerelease: false
