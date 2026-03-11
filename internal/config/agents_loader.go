@@ -21,14 +21,14 @@ type andyCodeAgentConfig struct {
 // andyCodeToolMap maps andy-code tool names to crush tool names.
 var andyCodeToolMap = map[string]string{
 	"read_file":  "view",
-	"list_dir":    "ls",
+	"list_dir":   "ls",
 	"write_file": "write",
-	"grep":        "grep",
-	"glob":        "glob",
-	"edit":        "edit",
-	"web_fetch":   "fetch",
-	"web_search":  "sourcegraph",
-	"todowrite":   "todos",
+	"grep":       "grep",
+	"glob":       "glob",
+	"edit":       "edit",
+	"web_fetch":  "fetch",
+	"web_search": "sourcegraph",
+	"todowrite":  "todos",
 	"todoread":   "todos",
 }
 

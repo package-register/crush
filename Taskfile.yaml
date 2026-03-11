@@ -77,9 +77,16 @@ tasks:
       - ./crush{exeExt} {{.CLI_ARGS}}
 
   test:
-    desc: Run tests
+    desc: Run tests (with race detector, requires CGO)
+    env:
+      CGO_ENABLED: "1"
     cmds:
       - go test -race -failfast ./... {{.CLI_ARGS}}
+
+  test:no-race:
+    desc: Run tests without race detector (works with CGO_ENABLED=0)
+    cmds:
+      - go test -failfast ./... {{.CLI_ARGS}}
 
   test:record:
     desc: Run tests and record all VCR cassettes again

@@ -34,7 +34,7 @@ name = "Ask"
 description = "Answer questions"
 tools = ["read_file", "grep", "glob"]
 system_prompt = "You are helpful."
-`), 0644)
+`), 0o644)
 	require.NoError(t, err)
 
 	result := LoadAgentsFromDir(dir, nil)
@@ -57,7 +57,7 @@ func TestLoadAgentsFromDir_MissingName_UsesID(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "custom.toml"), []byte(`
 description = "No name"
 tools = ["grep"]
-`), 0644)
+`), 0o644)
 	require.NoError(t, err)
 
 	result := LoadAgentsFromDir(dir, nil)
@@ -73,14 +73,14 @@ func TestLoadAgentsFromDir_InvalidToml_Skipped(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "valid.toml"), []byte(`
 name = "Valid"
 description = "OK"
-`), 0644)
+`), 0o644)
 	require.NoError(t, err)
 
 	// Invalid TOML - should be skipped
 	err = os.WriteFile(filepath.Join(dir, "invalid.toml"), []byte(`
 name = "Invalid
 invalid toml
-`), 0644)
+`), 0o644)
 	require.NoError(t, err)
 
 	result := LoadAgentsFromDir(dir, nil)
@@ -94,14 +94,14 @@ invalid toml
 func TestLoadAgentsFromDir_IgnoresNonToml(t *testing.T) {
 	dir := t.TempDir()
 
-	err := os.WriteFile(filepath.Join(dir, "agent.json"), []byte(`{}`), 0644)
+	err := os.WriteFile(filepath.Join(dir, "agent.json"), []byte(`{}`), 0o644)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(dir, "readme.md"), []byte("# readme"), 0644)
+	err = os.WriteFile(filepath.Join(dir, "readme.md"), []byte("# readme"), 0o644)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(dir, "valid.toml"), []byte(`
 name = "Valid"
 description = "OK"
-`), 0644)
+`), 0o644)
 	require.NoError(t, err)
 
 	result := LoadAgentsFromDir(dir, nil)
@@ -116,7 +116,7 @@ func TestLoadAgentsFromDir_ToolsMapping(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "tools.toml"), []byte(`
 name = "Tools"
 tools = ["read_file", "write_file", "unknown_tool", "grep"]
-`), 0644)
+`), 0o644)
 	require.NoError(t, err)
 
 	result := LoadAgentsFromDir(dir, nil)
@@ -136,7 +136,7 @@ func TestLoadAgentsFromDir_EmptyTools_UsesAllTools(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "all.toml"), []byte(`
 name = "All"
 description = "Uses all"
-`), 0644)
+`), 0o644)
 	require.NoError(t, err)
 
 	result := LoadAgentsFromDir(dir, nil)
@@ -151,7 +151,7 @@ func TestLoadAgentsFromDir_DisabledTools(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "agent.toml"), []byte(`
 name = "Agent"
 tools = ["read_file", "grep", "edit"]
-`), 0644)
+`), 0o644)
 	require.NoError(t, err)
 
 	result := LoadAgentsFromDir(dir, []string{"grep", "edit"})
