@@ -149,7 +149,7 @@ func TestHistoryService_GetThreadHistory_DefaultLimit(t *testing.T) {
 	}
 
 	// Test limit > 100 (should be capped at 100)
-	entries, total = hs.GetThreadHistory(threadID, 150, 0)
+	entries, _ = hs.GetThreadHistory(threadID, 150, 0)
 	if len(entries) != 100 {
 		t.Errorf("Expected 100 entries with limit 150 (capped), got %d", len(entries))
 	}
@@ -173,7 +173,7 @@ func TestHistoryService_Clear(t *testing.T) {
 	}
 
 	// Verify entries exist
-	entries, total := hs.GetThreadHistory(threadID, 10, 0)
+	_, total := hs.GetThreadHistory(threadID, 10, 0)
 	if total != 5 {
 		t.Errorf("Expected total 5 before clear, got %d", total)
 	}
@@ -182,7 +182,7 @@ func TestHistoryService_Clear(t *testing.T) {
 	hs.Clear(threadID)
 
 	// Verify entries are cleared
-	entries, total = hs.GetThreadHistory(threadID, 10, 0)
+	entries, total := hs.GetThreadHistory(threadID, 10, 0)
 	if total != 0 {
 		t.Errorf("Expected total 0 after clear, got %d", total)
 	}
@@ -577,7 +577,7 @@ func TestHistoryStore(t *testing.T) {
 
 	// Test clear
 	store.clear("thread-1")
-	entries, total = store.getThreadHistory("thread-1", 10, 0)
+	_, total = store.getThreadHistory("thread-1", 10, 0)
 	if total != 0 {
 		t.Errorf("Expected total 0 after clear, got %d", total)
 	}
@@ -606,13 +606,13 @@ func TestHistoryStore_Pagination(t *testing.T) {
 	}
 
 	// Test offset
-	entries, total = store.getThreadHistory("thread-1", 3, 5)
+	entries, _ = store.getThreadHistory("thread-1", 3, 5)
 	if len(entries) != 3 {
 		t.Errorf("Expected 3 entries with offset, got %d", len(entries))
 	}
 
 	// Test offset beyond total
-	entries, total = store.getThreadHistory("thread-1", 3, 100)
+	entries, _ = store.getThreadHistory("thread-1", 3, 100)
 	if len(entries) != 0 {
 		t.Errorf("Expected 0 entries for large offset, got %d", len(entries))
 	}

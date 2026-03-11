@@ -94,6 +94,7 @@ func (sm *SnapshotManager) runSnapshotLoop() {
 			for threadID := range sm.snapshots {
 				threadIDs = append(threadIDs, threadID)
 			}
+			_ = threadIDs
 			sm.mu.RUnlock()
 
 			// Note: Actual snapshot creation requires access to message source

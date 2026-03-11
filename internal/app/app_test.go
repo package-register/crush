@@ -119,6 +119,7 @@ func TestSetupSubscriber_NoTimerLeak(t *testing.T) {
 		goleak.IgnoreTopFunction("net/http.(*http2ClientConn).readLoop"),
 		goleak.IgnoreTopFunction("net/http.(*http2Transport).newClientConn"),
 		goleak.IgnoreTopFunction("internal/poll.runtime_pollWait"),
+		goleak.IgnoreTopFunction("github.com/charmbracelet/crush/internal/agui-server.(*RequestTracker).cleanupLoop"),
 	)
 	synctest.Test(t, func(t *testing.T) {
 		f := newSubscriberFixture(t, 100)

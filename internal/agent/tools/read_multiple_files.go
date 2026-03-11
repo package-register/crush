@@ -117,30 +117,30 @@ func NewReadMultipleFilesTool(
 			for _, result := range results {
 				if result.Error != "" {
 					failureCount++
-					output.WriteString(fmt.Sprintf("<file_error>\n"))
-					output.WriteString(fmt.Sprintf("  <path>%s</path>\n", result.Path))
-					output.WriteString(fmt.Sprintf("  <error>%s</error>\n", result.Error))
-					output.WriteString(fmt.Sprintf("</file_error>\n"))
+					fmt.Fprintf(&output, "<file_error>\n")
+					fmt.Fprintf(&output, "  <path>%s</path>\n", result.Path)
+					fmt.Fprintf(&output, "  <error>%s</error>\n", result.Error)
+					fmt.Fprintf(&output, "</file_error>\n")
 				} else {
 					successCount++
 					totalSize += int(result.Size)
-					output.WriteString(fmt.Sprintf("<file>\n"))
-					output.WriteString(fmt.Sprintf("  <path>%s</path>\n", result.Path))
-					output.WriteString(fmt.Sprintf("  <size>%d</size>\n", result.Size))
-					output.WriteString(fmt.Sprintf("  <content>\n%s\n  </content>\n", result.Content))
-					output.WriteString(fmt.Sprintf("</file>\n"))
+					fmt.Fprintf(&output, "<file>\n")
+					fmt.Fprintf(&output, "  <path>%s</path>\n", result.Path)
+					fmt.Fprintf(&output, "  <size>%d</size>\n", result.Size)
+					fmt.Fprintf(&output, "  <content>\n%s\n  </content>\n", result.Content)
+					fmt.Fprintf(&output, "</file>\n")
 				}
 			}
 
 			output.WriteString("</files>\n")
 
 			// Add summary
-			output.WriteString(fmt.Sprintf("\n<summary>\n"))
-			output.WriteString(fmt.Sprintf("  Total: %d files\n", len(results)))
-			output.WriteString(fmt.Sprintf("  Success: %d files\n", successCount))
-			output.WriteString(fmt.Sprintf("  Failed: %d files\n", failureCount))
-			output.WriteString(fmt.Sprintf("  Total size: %d bytes\n", totalSize))
-			output.WriteString(fmt.Sprintf("</summary>\n"))
+			fmt.Fprintf(&output, "\n<summary>\n")
+			fmt.Fprintf(&output, "  Total: %d files\n", len(results))
+			fmt.Fprintf(&output, "  Success: %d files\n", successCount)
+			fmt.Fprintf(&output, "  Failed: %d files\n", failureCount)
+			fmt.Fprintf(&output, "  Total size: %d bytes\n", totalSize)
+			fmt.Fprintf(&output, "</summary>\n")
 
 			if failureCount > 0 {
 				output.WriteString("\nNote: Some files failed to read. Check individual file_error entries for details.\n")
