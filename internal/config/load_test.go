@@ -359,6 +359,60 @@ func TestConfig_configureProvidersSetProviderID(t *testing.T) {
 	require.Equal(t, "openai", pc.ID)
 }
 
+func TestConfig_configureProvidersPreservesWireAPI(t *testing.T) {
+	knownProviders := []catwalk.Provider{
+		{
+			ID:          "codex",
+			Type:        catwalk.TypeOpenAICompat,
+			APIKey:      "$CODEX_API_KEY",
+			APIEndpoint: "http://154.12.94.233/v1",
+			Models: []catwalk.Model{{
+				ID: "gpt-4",
+			}},
+		},
+	}
+
+	cfg := &Config{
+		Providers: csync.NewMapFrom(map[string]ProviderConfig{
+			"codex": {
+				ID:      "codex",
+				Type:    catwalk.TypeOpenAICompat,
+				APIKey:  "sk-test",
+				BaseURL: "http://154.12.94.233/v1",
+				WireAPI: "responses",
+				Models: []catwalk.Model{{
+					ID: "gpt-4",
+				}},
+			},
+		}),
+	}
+	cfg.setDefaults("/tmp", "")
+
+	env := env.NewFromMap(map[string]string{
+		"CODEX_API_KEY": "sk-test",
+	})
+	resolver := NewEnvironmentVariableResolver(env)
+	err := cfg.configureProviders(env, resolver, knownProviders)
+	require.NoError(t, err)
+	require.Equal(t, 1, cfg.Providers.Len())
+
+	pc, ok := cfg.Providers.Get("codex")
+	require.True(t, ok, "codex provider should be present")
+	require.Equal(t, "responses", pc.WireAPI, "wire_api should be preserved for Responses API")
+}
+
+func TestConfig_loadFromBytesWithWireAPI(t *testing.T) {
+	jsonConfig := `{"providers":{"packyapi":{"id":"packyapi","type":"openai-compat","base_url":"https://api.example.com/v1","api_key":"sk-test","wire_api":"responses","models":[{"id":"gpt-4"}]}}}`
+	cfg, err := loadFromBytes([][]byte{[]byte(jsonConfig)})
+	require.NoError(t, err)
+	require.NotNil(t, cfg.Providers)
+
+	pc, ok := cfg.Providers.Get("packyapi")
+	require.True(t, ok, "packyapi provider should be present")
+	require.Equal(t, "responses", pc.WireAPI, "wire_api should be parsed from JSON")
+	require.Equal(t, "openai-compat", string(pc.Type))
+}
+
 func TestConfig_EnabledProviders(t *testing.T) {
 	t.Run("all providers enabled", func(t *testing.T) {
 		cfg := &Config{

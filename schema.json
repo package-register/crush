@@ -3,6 +3,37 @@
   "$id": "https://github.com/charmbracelet/crush/internal/config/config",
   "$ref": "#/$defs/Config",
   "$defs": {
+    "AguiServerOptions": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the AG-UI server is enabled",
+          "default": false
+        },
+        "port": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 1,
+          "description": "Port the AG-UI server listens on",
+          "default": 8080
+        },
+        "base_path": {
+          "type": "string",
+          "format": "uri-path",
+          "description": "Base path for AG-UI server endpoints",
+          "default": "/agui"
+        },
+        "cors_origins": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "List of allowed CORS origins for the AG-UI server"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "Attribution": {
       "properties": {
         "trailer_style": {
@@ -89,6 +120,10 @@
         "tools": {
           "$ref": "#/$defs/Tools",
           "description": "Tool configurations"
+        },
+        "webdav": {
+          "$ref": "#/$defs/WebDAVConfig",
+          "description": "WebDAV synchronization configuration"
         }
       },
       "additionalProperties": false,
@@ -352,6 +387,16 @@
     },
     "Options": {
       "properties": {
+        "active_mode": {
+          "type": "string",
+          "description": "Active agent mode (coder",
+          "default": "coder"
+        },
+        "tool_call_format": {
+          "type": "string",
+          "description": "Tool call format from model output: standard (API structured) or longcat (XML tags in text)",
+          "default": "standard"
+        },
         "context_paths": {
           "items": {
             "type": "string",
@@ -451,6 +496,31 @@
           "type": "boolean",
           "description": "Show indeterminate progress updates during long operations",
           "default": true
+        },
+        "agui_server": {
+          "$ref": "#/$defs/AguiServerOptions",
+          "description": "AG-UI server configuration options"
+        },
+        "bash": {
+          "$ref": "#/$defs/BashOptions",
+          "description": "Bash tool security options for allowing otherwise blocked commands"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "BashOptions": {
+      "properties": {
+        "allowed_commands": {
+          "items": {
+            "type": "string",
+            "examples": [
+              "go install",
+              "npm install -g"
+            ]
+          },
+          "type": "array",
+          "description": "Command patterns to allow despite default blocks"
         }
       },
       "additionalProperties": false,
@@ -540,6 +610,14 @@
         "extra_body": {
           "type": "object",
           "description": "Additional fields to include in request bodies"
+        },
+        "wire_api": {
+          "type": "string",
+          "enum": [
+            "completions",
+            "responses"
+          ],
+          "description": "API format for openai-compat: completions (default) or responses"
         },
         "provider_options": {
           "type": "object",
@@ -650,6 +728,16 @@
           ],
           "description": "Diff mode for the TUI interface"
         },
+        "keybinding_scheme": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "ide",
+            "standalone"
+          ],
+          "description": "Keybinding scheme: auto (detect from TERM_PROGRAM)",
+          "default": "auto"
+        },
         "completions": {
           "$ref": "#/$defs/Completions",
           "description": "Completions UI options"
@@ -737,6 +825,82 @@
         "ls",
         "grep"
       ]
+    },
+    "WebDAVConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether WebDAV sync is enabled",
+          "default": false
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "WebDAV server URL",
+          "examples": [
+            "https://webdav.example.com/"
+          ]
+        },
+        "username": {
+          "type": "string",
+          "description": "Username for WebDAV authentication"
+        },
+        "password": {
+          "type": "string",
+          "description": "Password for WebDAV authentication",
+          "examples": [
+            "${WEBDAV_PASSWORD}"
+          ]
+        },
+        "token": {
+          "type": "string",
+          "description": "Bearer token for WebDAV authentication"
+        },
+        "remote_path": {
+          "type": "string",
+          "description": "Remote directory path on WebDAV server",
+          "examples": [
+            "/crush-config"
+          ]
+        },
+        "sync_interval": {
+          "type": "string",
+          "description": "Sync interval (e.g.",
+          "examples": [
+            "5m",
+            "1h"
+          ]
+        },
+        "conflict_strategy": {
+          "type": "string",
+          "enum": [
+            "newer-wins",
+            "local-wins",
+            "remote-wins",
+            "backup"
+          ],
+          "description": "Conflict resolution strategy",
+          "default": "newer-wins"
+        },
+        "exclude_patterns": {
+          "items": {
+            "type": "string",
+            "examples": [
+              "*.tmp",
+              "*.lock"
+            ]
+          },
+          "type": "array",
+          "description": "File patterns to exclude from sync"
+        },
+        "skip_tls_verify": {
+          "type": "boolean",
+          "description": "Disable TLS certificate verification (for testing only)",
+          "default": false
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     }
   }
 }

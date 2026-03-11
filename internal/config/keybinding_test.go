@@ -51,9 +51,9 @@ func TestEffectiveKeybindingScheme(t *testing.T) {
 			expected: "standalone",
 		},
 		{
-			name: "nil options defaults to auto then standalone",
-			cfg:  &Config{Options: nil},
-			env:  map[string]string{"TERM_PROGRAM": ""}, // ensure not vscode
+			name:     "nil options defaults to auto then standalone",
+			cfg:      &Config{Options: nil},
+			env:      map[string]string{"TERM_PROGRAM": ""}, // ensure not vscode
 			expected: "standalone",
 		},
 	}
