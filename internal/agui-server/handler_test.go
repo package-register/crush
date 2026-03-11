@@ -494,6 +494,7 @@ func TestNewHandler(t *testing.T) {
 
 	if handler == nil {
 		t.Error("Expected handler to be created")
+		return
 	}
 	if handler.eventEmitter != eventEmitter {
 		t.Error("Expected eventEmitter to be set")

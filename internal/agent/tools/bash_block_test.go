@@ -61,7 +61,9 @@ func TestBlockFuncs_WithAllowedCommands(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			sh := shell.NewShell(&shell.Options{
 				WorkingDir: t.TempDir(),
 				BlockFuncs: blockFuncs(tt.bashOpts),

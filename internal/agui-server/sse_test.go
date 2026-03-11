@@ -400,6 +400,7 @@ func TestNewSSEHandler(t *testing.T) {
 
 	if handler == nil {
 		t.Error("Expected handler to be created")
+		return
 	}
 	if handler.manager != manager {
 		t.Error("Expected manager to be set")

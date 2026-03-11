@@ -148,8 +148,12 @@ func (c *Client) Ping(ctx context.Context) error {
 		return wrapError("ping", "", err)
 	}
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // Get downloads a file from the WebDAV server.
@@ -204,8 +208,12 @@ func (c *Client) Put(ctx context.Context, remotePath string, data []byte) error 
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.ContentLength = int64(len(data))
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // PutIfNoneMatch uploads a file only if it doesn't exist (If-None-Match: *).
@@ -218,8 +226,12 @@ func (c *Client) PutIfNoneMatch(ctx context.Context, remotePath string, data []b
 	req.Header.Set("If-None-Match", "*")
 	req.ContentLength = int64(len(data))
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // PutIfMatch uploads a file only if the ETag matches.
@@ -232,8 +244,12 @@ func (c *Client) PutIfMatch(ctx context.Context, remotePath string, data []byte,
 	req.Header.Set("If-Match", etag)
 	req.ContentLength = int64(len(data))
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // Delete removes a file or directory from the WebDAV server.
@@ -243,8 +259,12 @@ func (c *Client) Delete(ctx context.Context, remotePath string) error {
 		return wrapError("delete", remotePath, err)
 	}
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // MkCol creates a directory on the WebDAV server.
@@ -254,8 +274,12 @@ func (c *Client) MkCol(ctx context.Context, remotePath string) error {
 		return wrapError("mkcol", remotePath, err)
 	}
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // Copy copies a file or directory on the WebDAV server.
@@ -275,8 +299,12 @@ func (c *Client) Copy(ctx context.Context, srcPath, dstPath string, overwrite bo
 		req.Header.Set("Overwrite", "F")
 	}
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // Move moves a file or directory on the WebDAV server.
@@ -296,8 +324,12 @@ func (c *Client) Move(ctx context.Context, srcPath, dstPath string, overwrite bo
 		req.Header.Set("Overwrite", "F")
 	}
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // PropFind performs a PROPFIND request to retrieve properties.
@@ -331,8 +363,12 @@ func (c *Client) PropPatch(ctx context.Context, remotePath string, propPatchXML 
 	}
 	req.Header.Set("Content-Type", "application/xml")
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // Lock creates a lock on a resource.
@@ -377,8 +413,12 @@ func (c *Client) Unlock(ctx context.Context, remotePath string, lockToken string
 	}
 	req.Header.Set("Lock-Token", "<"+lockToken+">")
 
-	_, err = c.doRequest(req)
-	return err
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // newRequest creates a new HTTP request with the given method and path.

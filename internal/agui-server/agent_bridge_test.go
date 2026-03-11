@@ -53,6 +53,7 @@ func TestNewAgentBridge(t *testing.T) {
 
 	if bridge == nil {
 		t.Error("Expected bridge to be created")
+		return
 	}
 	if bridge.eventEmitter != eventEmitter {
 		t.Error("Expected eventEmitter to be set")
@@ -453,6 +454,7 @@ func TestNewSessionManager(t *testing.T) {
 
 	if manager == nil {
 		t.Error("Expected manager to be created")
+		return
 	}
 	if manager.sessions == nil {
 		t.Error("Expected sessions map to be initialized")
