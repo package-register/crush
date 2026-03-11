@@ -10,10 +10,12 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"net"
 	"net/http"
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
@@ -41,6 +43,15 @@ import (
 	"charm.land/fantasy/providers/vercel"
 	openaisdk "github.com/openai/openai-go/v2/option"
 	"github.com/qjebbs/go-jsons"
+)
+
+const (
+	// subAgentTimeout is the default timeout for sub-agent execution.
+	subAgentTimeout = 10 * time.Minute
+	// subAgentMaxRetries is the maximum number of retries for network errors.
+	subAgentMaxRetries = 2
+	// subAgentRetryDelay is the initial delay between retries.
+	subAgentRetryDelay = 1 * time.Second
 )
 
 type Coordinator interface {
@@ -440,7 +451,7 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent) ([]fan
 	}
 
 	allTools = append(allTools,
-		tools.NewBashTool(c.permissions, c.cfg.WorkingDir(), c.cfg.Options.Attribution, modelName),
+		tools.NewBashTool(c.permissions, c.cfg.WorkingDir(), c.cfg.Options.Attribution, modelName, c.cfg.Options.Bash),
 		tools.NewJobOutputTool(),
 		tools.NewJobKillTool(),
 		tools.NewDownloadTool(c.permissions, c.cfg.WorkingDir(), nil),
@@ -667,7 +678,7 @@ func (c *coordinator) buildVercelProvider(_, apiKey string, headers map[string]s
 	return vercel.New(opts...)
 }
 
-func (c *coordinator) buildOpenaiCompatProvider(baseURL, apiKey string, headers map[string]string, extraBody map[string]any, providerID string, isSubAgent bool) (fantasy.Provider, error) {
+func (c *coordinator) buildOpenaiCompatProvider(baseURL, apiKey string, headers map[string]string, extraBody map[string]any, providerID string, isSubAgent bool, wireAPI string) (fantasy.Provider, error) {
 	opts := []openaicompat.Option{
 		openaicompat.WithBaseURL(baseURL),
 		openaicompat.WithAPIKey(apiKey),
@@ -675,8 +686,11 @@ func (c *coordinator) buildOpenaiCompatProvider(baseURL, apiKey string, headers 
 
 	// Set HTTP client based on provider and debug mode.
 	var httpClient *http.Client
-	if providerID == string(catwalk.InferenceProviderCopilot) {
+	useResponsesAPI := providerID == string(catwalk.InferenceProviderCopilot) || strings.EqualFold(wireAPI, "responses")
+	if useResponsesAPI {
 		opts = append(opts, openaicompat.WithUseResponsesAPI())
+	}
+	if providerID == string(catwalk.InferenceProviderCopilot) {
 		httpClient = copilot.NewClient(isSubAgent, c.cfg.Options.Debug)
 	} else if c.cfg.Options.Debug {
 		httpClient = log.NewHTTPClient()
@@ -841,7 +855,7 @@ func (c *coordinator) buildProvider(providerCfg config.ProviderConfig, model con
 			}
 			providerCfg.ExtraBody["tool_stream"] = true
 		}
-		return c.buildOpenaiCompatProvider(baseURL, apiKey, headers, providerCfg.ExtraBody, providerCfg.ID, isSubAgent)
+		return c.buildOpenaiCompatProvider(baseURL, apiKey, headers, providerCfg.ExtraBody, providerCfg.ID, isSubAgent, providerCfg.WireAPI)
 	case hyper.Name:
 		return c.buildHyperProvider(baseURL, apiKey)
 	default:
@@ -981,8 +995,11 @@ func (c *coordinator) runSubAgent(ctx context.Context, params subAgentParams) (f
 	agentToolSessionID := c.sessions.CreateAgentToolSessionID(params.AgentMessageID, params.ToolCallID)
 	session, err := c.sessions.CreateTaskSession(ctx, agentToolSessionID, params.SessionID, params.SessionTitle)
 	if err != nil {
-		return fantasy.ToolResponse{}, fmt.Errorf("create session: %w", err)
+		slog.Error("Failed to create sub-agent session", "parent_session", params.SessionID, "title", params.SessionTitle, "error", err)
+		return fantasy.ToolResponse{}, NewSubAgentError("create_session", "", err)
 	}
+
+	slog.Info("Sub-agent session created", "session_id", session.ID, "parent_session", params.SessionID, "title", params.SessionTitle, "prompt_length", len(params.Prompt))
 
 	// Call session setup function if provided
 	if params.SessionSetup != nil {
@@ -998,31 +1015,137 @@ func (c *coordinator) runSubAgent(ctx context.Context, params subAgentParams) (f
 
 	providerCfg, ok := c.cfg.Providers.Get(model.ModelCfg.Provider)
 	if !ok {
-		return fantasy.ToolResponse{}, errors.New("model provider not configured")
+		slog.Error("Sub-agent provider not configured", "session_id", session.ID, "provider", model.ModelCfg.Provider)
+		return fantasy.ToolResponse{}, NewSubAgentError("get_provider", session.ID, errors.New("model provider not configured"))
 	}
 
-	// Run the agent
-	result, err := params.Agent.Run(ctx, SessionAgentCall{
-		SessionID:        session.ID,
-		Prompt:           params.Prompt,
-		MaxOutputTokens:  maxTokens,
-		ProviderOptions:  getProviderOptions(model, providerCfg),
-		Temperature:      model.ModelCfg.Temperature,
-		TopP:             model.ModelCfg.TopP,
-		TopK:             model.ModelCfg.TopK,
-		FrequencyPenalty: model.ModelCfg.FrequencyPenalty,
-		PresencePenalty:  model.ModelCfg.PresencePenalty,
-	})
-	if err != nil {
-		return fantasy.NewTextErrorResponse("error generating response"), nil
+	// Create timeout context for sub-agent execution
+	subAgentCtx, cancel := context.WithTimeout(ctx, subAgentTimeout)
+	defer cancel()
+
+	slog.Info("Starting sub-agent execution", "session_id", session.ID, "timeout", subAgentTimeout, "max_retries", subAgentMaxRetries)
+
+	// Run the agent with retry logic for network errors
+	var result *fantasy.AgentResult
+	var runErr error
+	var attempt int
+
+	for attempt = 0; attempt <= subAgentMaxRetries; attempt++ {
+		if attempt > 0 {
+			// Calculate retry delay with exponential backoff
+			delay := subAgentRetryDelay * time.Duration(1<<uint(attempt-1))
+			slog.Warn("Retrying sub-agent execution", "session_id", session.ID, "attempt", attempt, "max_retries", subAgentMaxRetries, "delay", delay, "error", runErr)
+			select {
+			case <-time.After(delay):
+			case <-subAgentCtx.Done():
+				slog.Error("Sub-agent execution canceled during retry", "session_id", session.ID, "error", subAgentCtx.Err())
+				return fantasy.ToolResponse{}, NewSubAgentError("execute", session.ID, subAgentCtx.Err())
+			}
+		}
+
+		slog.Debug("Executing sub-agent", "session_id", session.ID, "attempt", attempt+1)
+		result, runErr = params.Agent.Run(subAgentCtx, SessionAgentCall{
+			SessionID:        session.ID,
+			Prompt:           params.Prompt,
+			MaxOutputTokens:  maxTokens,
+			ProviderOptions:  getProviderOptions(model, providerCfg),
+			Temperature:      model.ModelCfg.Temperature,
+			TopP:             model.ModelCfg.TopP,
+			TopK:             model.ModelCfg.TopK,
+			FrequencyPenalty: model.ModelCfg.FrequencyPenalty,
+			PresencePenalty:  model.ModelCfg.PresencePenalty,
+		})
+
+		if runErr == nil {
+			slog.Debug("Sub-agent execution succeeded", "session_id", session.ID, "attempt", attempt+1)
+			break // Success
+		}
+
+		// Check if error is retryable (network-related)
+		if !c.isRetryableError(runErr) {
+			slog.Debug("Sub-agent execution failed with non-retryable error", "session_id", session.ID, "error", runErr)
+			break // Non-retryable error
+		}
+
+		slog.Warn("Sub-agent execution failed with retryable error", "session_id", session.ID, "attempt", attempt+1, "error", runErr)
+	}
+
+	if runErr != nil {
+		// Log the final error with full context
+		slog.Error("Sub-agent execution failed after all retries", "session_id", session.ID, "parent_session", params.SessionID, "error", runErr, "total_attempts", attempt)
+		return fantasy.NewTextErrorResponse(formatSubAgentError(runErr)), nil
 	}
 
 	// Update parent session cost
 	if err := c.updateParentSessionCost(ctx, session.ID, params.SessionID); err != nil {
-		return fantasy.ToolResponse{}, err
+		slog.Error("Failed to update parent session cost", "child_session", session.ID, "parent_session", params.SessionID, "error", err)
+		return fantasy.ToolResponse{}, NewSubAgentError("update_cost", session.ID, err)
 	}
 
+	slog.Info("Sub-agent completed successfully", "session_id", session.ID, "parent_session", params.SessionID, "prompt_length", len(params.Prompt))
+
 	return fantasy.NewTextResponse(result.Response.Content.Text()), nil
+}
+
+// isRetryableError checks if an error is retryable (network-related).
+func (c *coordinator) isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for context errors (timeout, cancellation) - not retryable
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return false
+	}
+
+	// Check for network timeout errors
+	if netErr, ok := errors.AsType[net.Error](err); ok {
+		return netErr.Timeout()
+	}
+
+	// Check for HTTP errors - retry on server errors and rate limits
+	if httpErr, ok := errors.AsType[*fantasy.ProviderError](err); ok {
+		return httpErr.StatusCode >= 500 || httpErr.StatusCode == 429
+	}
+
+	// Check for generic network errors in error message
+	errStr := err.Error()
+	retryablePatterns := []string{
+		"connection reset",
+		"broken pipe",
+		"network is unreachable",
+		"timeout",
+		"temporary failure",
+		"i/o timeout",
+	}
+	for _, pattern := range retryablePatterns {
+		if strings.Contains(errStr, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// formatSubAgentError formats a sub-agent error for user display.
+func formatSubAgentError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	if subErr, ok := errors.AsType[*SubAgentError](err); ok {
+		return fmt.Sprintf("Sub-agent failed to %s: %v", subErr.Op, subErr.Err)
+	}
+
+	// Check for context errors
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Sprintf("Sub-agent timed out after %v", subAgentTimeout)
+	}
+	if errors.Is(err, context.Canceled) {
+		return "Sub-agent was canceled by user"
+	}
+
+	return fmt.Sprintf("Sub-agent error: %v", err)
 }
 
 // updateParentSessionCost accumulates the cost from a child session to its parent session.

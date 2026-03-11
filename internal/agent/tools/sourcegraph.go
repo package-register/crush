@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -98,20 +99,24 @@ func NewSourcegraphTool(client *http.Client) fantasy.AgentTool {
 				bytes.NewBuffer([]byte(graphqlQuery)),
 			)
 			if err != nil {
+				slog.Error("Failed to create Sourcegraph request", "query", params.Query, "error", err)
 				return fantasy.ToolResponse{}, fmt.Errorf("failed to create request: %w", err)
 			}
 
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("User-Agent", "crush/1.0")
 
+			slog.Debug("Executing Sourcegraph search", "query", params.Query, "count", params.Count)
 			resp, err := client.Do(req)
 			if err != nil {
+				slog.Error("Sourcegraph request failed", "query", params.Query, "error", err)
 				return fantasy.ToolResponse{}, fmt.Errorf("failed to fetch URL: %w", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
 				body, _ := io.ReadAll(resp.Body)
+				slog.Error("Sourcegraph request failed", "query", params.Query, "status", resp.StatusCode, "response", string(body))
 				if len(body) > 0 {
 					return fantasy.NewTextErrorResponse(fmt.Sprintf("Request failed with status code: %d, response: %s", resp.StatusCode, string(body))), nil
 				}
@@ -120,18 +125,23 @@ func NewSourcegraphTool(client *http.Client) fantasy.AgentTool {
 			}
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
+				slog.Error("Failed to read Sourcegraph response body", "query", params.Query, "error", err)
 				return fantasy.ToolResponse{}, fmt.Errorf("failed to read response body: %w", err)
 			}
 
 			var result map[string]any
 			if err = json.Unmarshal(body, &result); err != nil {
+				slog.Error("Failed to unmarshal Sourcegraph response", "query", params.Query, "error", err)
 				return fantasy.ToolResponse{}, fmt.Errorf("failed to unmarshal response: %w", err)
 			}
 
 			formattedResults, err := formatSourcegraphResults(result, params.ContextWindow)
 			if err != nil {
+				slog.Error("Failed to format Sourcegraph results", "query", params.Query, "error", err)
 				return fantasy.NewTextErrorResponse("Failed to format results: " + err.Error()), nil
 			}
+
+			slog.Debug("Sourcegraph search completed", "query", params.Query)
 
 			return fantasy.NewTextResponse(formattedResults), nil
 		})
@@ -146,6 +156,7 @@ func formatSourcegraphResults(result map[string]any, contextWindow int) (string,
 			if errMap, ok := err.(map[string]any); ok {
 				if message, ok := errMap["message"].(string); ok {
 					fmt.Fprintf(&buffer, "- %s\n", message)
+					slog.Debug("Sourcegraph API error", "message", message)
 				}
 			}
 		}
