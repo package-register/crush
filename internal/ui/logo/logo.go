@@ -29,49 +29,33 @@ type Opts struct {
 	Width        int         // width of the rendered logo, used for truncation
 }
 
-// Render renders the Crush logo. Set the argument to true to render the narrow
-// version, intended for use in a sidebar.
+// Render renders the sko code logo with Fromsko branding.
 //
 // The compact argument determines whether it renders compact for the sidebar
 // or wider for the main pane.
 func Render(s *styles.Styles, version string, compact bool, o Opts) string {
-	const charm = " Charm™"
+	const brand = "Fromsko"
+	const title = "sko code"
 
-	fg := func(c color.Color, s string) string {
-		return lipgloss.NewStyle().Foreground(c).Render(s)
+	fg := func(c color.Color, str string) string {
+		return lipgloss.NewStyle().Foreground(c).Render(str)
 	}
 
-	// Title.
-	const spacing = 1
-	letterforms := []letterform{
-		letterC,
-		letterR,
-		letterU,
-		letterSStylized,
-		letterH,
-	}
-	stretchIndex := -1 // -1 means no stretching.
-	if !compact {
-		stretchIndex = cachedRandN(len(letterforms))
-	}
+	// Main title with gradient.
+	titleRendered := styles.ApplyBoldForegroundGrad(s, title, o.TitleColorA, o.TitleColorB)
+	titleWidth := lipgloss.Width(titleRendered)
 
-	crush := renderWord(spacing, stretchIndex, letterforms...)
-	crushWidth := lipgloss.Width(crush)
-	b := new(strings.Builder)
-	for r := range strings.SplitSeq(crush, "\n") {
-		fmt.Fprintln(b, styles.ApplyForegroundGrad(s, r, o.TitleColorA, o.TitleColorB))
-	}
-	crush = b.String()
-
-	// Charm and version.
+	// Meta row: Fromsko (left) + version (right).
 	metaRowGap := 1
-	maxVersionWidth := crushWidth - lipgloss.Width(charm) - metaRowGap
-	version = ansi.Truncate(version, maxVersionWidth, "…") // truncate version if too long.
-	gap := max(0, crushWidth-lipgloss.Width(charm)-lipgloss.Width(version))
-	metaRow := fg(o.CharmColor, charm) + strings.Repeat(" ", gap) + fg(o.VersionColor, version)
+	maxVersionWidth := titleWidth - lipgloss.Width(brand) - metaRowGap
+	version = ansi.Truncate(version, maxVersionWidth, "…")
+	gap := max(0, titleWidth-lipgloss.Width(brand)-lipgloss.Width(version))
+	metaRow := fg(o.CharmColor, brand) + strings.Repeat(" ", gap) + fg(o.VersionColor, version)
+	metaRowWidth := lipgloss.Width(metaRow)
+	crushWidth := max(titleWidth, metaRowWidth)
 
-	// Join the meta row and big Crush title.
-	crush = strings.TrimSpace(metaRow + "\n" + crush)
+	// Join meta row and title.
+	crush := strings.TrimSpace(metaRow + "\n" + titleRendered)
 
 	// Narrow version.
 	if compact {
@@ -94,11 +78,11 @@ func Render(s *styles.Styles, version string, compact bool, o Opts) string {
 	const stepDownAt = 0
 	rightField := new(strings.Builder)
 	for i := range fieldHeight {
-		width := rightWidth
+		w := rightWidth
 		if i >= stepDownAt {
-			width = rightWidth - (i - stepDownAt)
+			w = rightWidth - (i - stepDownAt)
 		}
-		fmt.Fprint(rightField, fg(o.FieldColor, strings.Repeat(diag, width)), "\n")
+		fmt.Fprint(rightField, fg(o.FieldColor, strings.Repeat(diag, w)), "\n")
 	}
 
 	// Return the wide version.
@@ -115,12 +99,12 @@ func Render(s *styles.Styles, version string, compact bool, o Opts) string {
 	return logo
 }
 
-// SmallRender renders a smaller version of the Crush logo, suitable for
+// SmallRender renders a smaller version of the sko code logo, suitable for
 // smaller windows or sidebar usage.
 func SmallRender(t *styles.Styles, width int) string {
-	title := t.Base.Foreground(t.Secondary).Render("Charm™")
-	title = fmt.Sprintf("%s %s", title, styles.ApplyBoldForegroundGrad(t, "Crush", t.Secondary, t.Primary))
-	remainingWidth := width - lipgloss.Width(title) - 1 // 1 for the space after "Crush"
+	title := t.Base.Foreground(t.Secondary).Render("Fromsko")
+	title = fmt.Sprintf("%s %s", title, styles.ApplyBoldForegroundGrad(t, "sko code", t.Secondary, t.Primary))
+	remainingWidth := width - lipgloss.Width(title) - 1
 	if remainingWidth > 0 {
 		lines := strings.Repeat("╱", remainingWidth)
 		title = fmt.Sprintf("%s %s", title, t.Base.Foreground(t.Primary).Render(lines))

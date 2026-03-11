@@ -496,8 +496,8 @@ func (s *Styles) DialogHelpStyles() help.Styles {
 // DefaultStyles returns the default styles for the UI.
 func DefaultStyles() Styles {
 	var (
-		primary   = charmtone.Charple
-		secondary = charmtone.Dolly
+		primary   = charmtone.Turtle // cyan
+		secondary = charmtone.Zinc   // teal
 		tertiary  = charmtone.Bok
 		// accent    = charmtone.Zest
 
@@ -516,7 +516,7 @@ func DefaultStyles() Styles {
 
 		// Borders
 		border      = charmtone.Charcoal
-		borderFocus = charmtone.Charple
+		borderFocus = charmtone.Turtle
 
 		// Status
 		error   = charmtone.Sriracha
