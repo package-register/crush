@@ -34,6 +34,19 @@ const (
 )
 
 func main() {
+	// Custom usage message
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: agui-client [flags]\n\n")
+		fmt.Fprintf(os.Stderr, "A client for testing AG-UI server SSE streaming functionality.\n\n")
+		fmt.Fprintf(os.Stderr, "Flags:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  # Connect to local AG-UI server\n")
+		fmt.Fprintf(os.Stderr, "  agui-client -endpoint http://localhost:8080/agui/sse\n\n")
+		fmt.Fprintf(os.Stderr, "  # Connect to remote AG-UI server\n")
+		fmt.Fprintf(os.Stderr, "  agui-client -endpoint http://your-server:8080/agui/sse\n")
+	}
+
 	endpoint := flag.String("endpoint", defaultEndpoint, "AG-UI SSE endpoint")
 	flag.Parse()
 
