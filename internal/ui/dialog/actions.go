@@ -80,6 +80,10 @@ type (
 		Arguments   []commands.Argument
 		Args        map[string]string // Actual argument values
 	}
+	// ActionOpenWebDAVConfig is a message to open the WebDAV configuration dialog.
+	ActionOpenWebDAVConfig struct{}
+	// ActionOpenAguiConfig is a message to open the AGUI server configuration dialog.
+	ActionOpenAguiConfig struct{}
 )
 
 // Messages for API key input dialog.

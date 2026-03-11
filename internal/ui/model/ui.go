@@ -1276,6 +1276,16 @@ func (m *UI) handleDialogMsg(msg tea.Msg) tea.Cmd {
 		}
 		cmds = append(cmds, m.initializeProject())
 		m.dialog.CloseDialog(dialog.CommandsID)
+	case dialog.ActionOpenWebDAVConfig:
+		m.dialog.CloseDialog(dialog.CommandsID)
+		if cmd := m.openWebDAVConfigDialog(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	case dialog.ActionOpenAguiConfig:
+		m.dialog.CloseDialog(dialog.CommandsID)
+		if cmd := m.openAguiConfigDialog(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 	case dialog.ActionSelectModel:
 		if m.isAgentBusy() {
@@ -2837,6 +2847,14 @@ func (m *UI) openDialog(id string) tea.Cmd {
 		if cmd := m.openQuitDialog(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
+	case dialog.WebDAVConfigID:
+		if cmd := m.openWebDAVConfigDialog(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	case dialog.AguiConfigID:
+		if cmd := m.openAguiConfigDialog(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	default:
 		// Unknown dialog
 		break
@@ -2916,6 +2934,42 @@ func (m *UI) openReasoningDialog() tea.Cmd {
 
 	m.dialog.OpenDialog(reasoningDialog)
 	return nil
+}
+
+// openWebDAVConfigDialog opens the WebDAV configuration dialog.
+func (m *UI) openWebDAVConfigDialog() tea.Cmd {
+	if m.dialog.ContainsDialog(dialog.WebDAVConfigID) {
+		m.dialog.BringToFront(dialog.WebDAVConfigID)
+		return nil
+	}
+
+	cfg := m.com.Config()
+	var webdavCfg *config.WebDAVConfig
+	if cfg != nil {
+		webdavCfg = cfg.WebDAV
+	}
+
+	webdavDialog, cmd := dialog.NewWebDAVConfig(m.com, webdavCfg)
+	m.dialog.OpenDialog(webdavDialog)
+	return cmd
+}
+
+// openAguiConfigDialog opens the AGUI server configuration dialog.
+func (m *UI) openAguiConfigDialog() tea.Cmd {
+	if m.dialog.ContainsDialog(dialog.AguiConfigID) {
+		m.dialog.BringToFront(dialog.AguiConfigID)
+		return nil
+	}
+
+	cfg := m.com.Config()
+	var aguiCfg *config.AguiServerOptions
+	if cfg != nil && cfg.Options != nil {
+		aguiCfg = cfg.Options.AguiServer
+	}
+
+	aguiDialog, cmd := dialog.NewAguiConfig(m.com, aguiCfg)
+	m.dialog.OpenDialog(aguiDialog)
+	return cmd
 }
 
 // openSessionsDialog opens the sessions dialog. If the dialog is already open,
