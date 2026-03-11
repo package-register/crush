@@ -1430,6 +1430,40 @@ func (m *UI) handleDialogMsg(msg tea.Msg) tea.Cmd {
 			return util.NewInfoMsg("Reasoning effort set to " + msg.Effort)
 		})
 		m.dialog.CloseDialog(dialog.ReasoningID)
+	case dialog.ActionSelectMode:
+		if m.isAgentBusy() {
+			cmds = append(cmds, util.ReportWarn("Agent is busy, please wait..."))
+			break
+		}
+
+		cfg := m.com.Config()
+		if cfg == nil {
+			cmds = append(cmds, util.ReportError(errors.New("configuration not found")))
+			break
+		}
+
+		if err := cfg.ValidateModeID(msg.ModeID); err != nil {
+			cmds = append(cmds, util.ReportError(err))
+			break
+		}
+
+		if err := cfg.SetActiveMode(msg.ModeID); err != nil {
+			cmds = append(cmds, util.ReportError(err))
+			break
+		}
+
+		agentName := msg.ModeID
+		if agent, ok := cfg.Agents[msg.ModeID]; ok && agent.Name != "" {
+			agentName = agent.Name
+		}
+
+		cmds = append(cmds, func() tea.Msg {
+			if err := m.com.App.UpdateAgentModel(context.TODO()); err != nil {
+				return util.ReportError(err)
+			}
+			return util.NewInfoMsg("Mode switched to " + agentName)
+		})
+		m.dialog.CloseDialog(dialog.ModesID)
 	case dialog.ActionPermissionResponse:
 		m.dialog.CloseDialog(dialog.PermissionsID)
 		switch msg.Action {
@@ -2895,6 +2929,10 @@ func (m *UI) openDialog(id string) tea.Cmd {
 		if cmd := m.openReasoningDialog(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
+	case dialog.ModesID:
+		if cmd := m.openModesDialog(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	case dialog.QuitID:
 		if cmd := m.openQuitDialog(); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -2985,6 +3023,22 @@ func (m *UI) openReasoningDialog() tea.Cmd {
 	}
 
 	m.dialog.OpenDialog(reasoningDialog)
+	return nil
+}
+
+// openModesDialog opens the agent mode selection dialog.
+func (m *UI) openModesDialog() tea.Cmd {
+	if m.dialog.ContainsDialog(dialog.ModesID) {
+		m.dialog.BringToFront(dialog.ModesID)
+		return nil
+	}
+
+	modesDialog, err := dialog.NewModes(m.com)
+	if err != nil {
+		return util.ReportError(err)
+	}
+
+	m.dialog.OpenDialog(modesDialog)
 	return nil
 }
 
