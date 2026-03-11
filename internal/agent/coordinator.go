@@ -92,6 +92,7 @@ type coordinator struct {
 	notify      pubsub.Publisher[notify.Notification]
 
 	currentAgent SessionAgent
+	currentMode  string
 	agents       map[string]SessionAgent
 
 	readyWg errgroup.Group
@@ -142,6 +143,7 @@ func NewCoordinator(
 		return nil, err
 	}
 	c.currentAgent = agent
+	c.currentMode = activeMode
 	c.agents[activeMode] = agent
 	return c, nil
 }
@@ -418,6 +420,13 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 	})
 
 	c.readyWg.Go(func() error {
+		if agent.SystemPrompt != "" {
+			result.SetSystemPrompt(agent.SystemPrompt)
+			return nil
+		}
+		if prompt == nil {
+			return fmt.Errorf("prompt required when agent has no SystemPrompt")
+		}
 		systemPrompt, err := prompt.Build(ctx, large.Model.Provider(), large.Model.Model(), *c.cfg)
 		if err != nil {
 			return err
@@ -902,13 +911,6 @@ func (c *coordinator) Model() Model {
 }
 
 func (c *coordinator) UpdateModels(ctx context.Context) error {
-	// build the models again so we make sure we get the latest config
-	large, small, err := c.buildAgentModels(ctx, false)
-	if err != nil {
-		return err
-	}
-	c.currentAgent.SetModels(large, small)
-
 	activeMode := config.AgentCoder
 	if c.cfg.Options != nil && c.cfg.Options.ActiveMode != "" {
 		activeMode = c.cfg.Options.ActiveMode
@@ -920,6 +922,33 @@ func (c *coordinator) UpdateModels(ctx context.Context) error {
 	if !ok {
 		return errCoderAgentNotConfigured
 	}
+
+	// When mode changed, rebuild the agent entirely (different tools + possibly different system prompt)
+	if activeMode != c.currentMode {
+		var p *prompt.Prompt
+		if agentCfg.SystemPrompt == "" {
+			var err error
+			p, err = coderPrompt(prompt.WithWorkingDir(c.cfg.WorkingDir()))
+			if err != nil {
+				return err
+			}
+		}
+		agent, err := c.buildAgent(ctx, p, agentCfg, false)
+		if err != nil {
+			return err
+		}
+		c.currentAgent = agent
+		c.currentMode = activeMode
+		c.agents[activeMode] = agent
+		return nil
+	}
+
+	// Same mode: just refresh models and tools
+	large, small, err := c.buildAgentModels(ctx, false)
+	if err != nil {
+		return err
+	}
+	c.currentAgent.SetModels(large, small)
 
 	tools, err := c.buildTools(ctx, agentCfg)
 	if err != nil {

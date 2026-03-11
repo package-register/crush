@@ -1,0 +1,221 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestLoadAgentsFromDir_EmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	result := LoadAgentsFromDir(dir, nil)
+	assert.Empty(t, result)
+}
+
+func TestLoadAgentsFromDir_NonExistentDir(t *testing.T) {
+	result := LoadAgentsFromDir("/nonexistent/path/12345", nil)
+	assert.Empty(t, result)
+}
+
+func TestLoadAgentsFromDir_EmptyString(t *testing.T) {
+	result := LoadAgentsFromDir("", nil)
+	assert.Empty(t, result)
+}
+
+func TestLoadAgentsFromDir_ValidToml(t *testing.T) {
+	dir := t.TempDir()
+
+	// Valid agent file
+	err := os.WriteFile(filepath.Join(dir, "ask.toml"), []byte(`
+name = "Ask"
+description = "Answer questions"
+tools = ["read_file", "grep", "glob"]
+system_prompt = "You are helpful."
+`), 0644)
+	require.NoError(t, err)
+
+	result := LoadAgentsFromDir(dir, nil)
+	require.Len(t, result, 1)
+	agent, ok := result["ask"]
+	require.True(t, ok)
+	assert.Equal(t, "ask", agent.ID)
+	assert.Equal(t, "Ask", agent.Name)
+	assert.Equal(t, "Answer questions", agent.Description)
+	assert.Equal(t, SelectedModelTypeLarge, agent.Model)
+	assert.Contains(t, agent.AllowedTools, "view")
+	assert.Contains(t, agent.AllowedTools, "grep")
+	assert.Contains(t, agent.AllowedTools, "glob")
+	assert.Equal(t, "You are helpful.", agent.SystemPrompt)
+}
+
+func TestLoadAgentsFromDir_MissingName_UsesID(t *testing.T) {
+	dir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(dir, "custom.toml"), []byte(`
+description = "No name"
+tools = ["grep"]
+`), 0644)
+	require.NoError(t, err)
+
+	result := LoadAgentsFromDir(dir, nil)
+	require.Len(t, result, 1)
+	agent := result["custom"]
+	assert.Equal(t, "custom", agent.Name, "should use filename as name when name is empty")
+}
+
+func TestLoadAgentsFromDir_InvalidToml_Skipped(t *testing.T) {
+	dir := t.TempDir()
+
+	// Valid file
+	err := os.WriteFile(filepath.Join(dir, "valid.toml"), []byte(`
+name = "Valid"
+description = "OK"
+`), 0644)
+	require.NoError(t, err)
+
+	// Invalid TOML - should be skipped
+	err = os.WriteFile(filepath.Join(dir, "invalid.toml"), []byte(`
+name = "Invalid
+invalid toml
+`), 0644)
+	require.NoError(t, err)
+
+	result := LoadAgentsFromDir(dir, nil)
+	require.Len(t, result, 1, "only valid file should be loaded")
+	_, ok := result["valid"]
+	require.True(t, ok)
+	_, ok = result["invalid"]
+	assert.False(t, ok)
+}
+
+func TestLoadAgentsFromDir_IgnoresNonToml(t *testing.T) {
+	dir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(dir, "agent.json"), []byte(`{}`), 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(dir, "readme.md"), []byte("# readme"), 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(dir, "valid.toml"), []byte(`
+name = "Valid"
+description = "OK"
+`), 0644)
+	require.NoError(t, err)
+
+	result := LoadAgentsFromDir(dir, nil)
+	require.Len(t, result, 1)
+	_, ok := result["valid"]
+	require.True(t, ok)
+}
+
+func TestLoadAgentsFromDir_ToolsMapping(t *testing.T) {
+	dir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(dir, "tools.toml"), []byte(`
+name = "Tools"
+tools = ["read_file", "write_file", "unknown_tool", "grep"]
+`), 0644)
+	require.NoError(t, err)
+
+	result := LoadAgentsFromDir(dir, nil)
+	require.Len(t, result, 1)
+	agent := result["tools"]
+
+	// read_file -> view, write_file -> write, unknown_tool dropped, grep -> grep
+	assert.Contains(t, agent.AllowedTools, "view")
+	assert.Contains(t, agent.AllowedTools, "write")
+	assert.Contains(t, agent.AllowedTools, "grep")
+	assert.NotContains(t, agent.AllowedTools, "unknown_tool")
+}
+
+func TestLoadAgentsFromDir_EmptyTools_UsesAllTools(t *testing.T) {
+	dir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(dir, "all.toml"), []byte(`
+name = "All"
+description = "Uses all"
+`), 0644)
+	require.NoError(t, err)
+
+	result := LoadAgentsFromDir(dir, nil)
+	require.Len(t, result, 1)
+	agent := result["all"]
+	assert.Equal(t, allToolNames(), agent.AllowedTools)
+}
+
+func TestLoadAgentsFromDir_DisabledTools(t *testing.T) {
+	dir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(dir, "agent.toml"), []byte(`
+name = "Agent"
+tools = ["read_file", "grep", "edit"]
+`), 0644)
+	require.NoError(t, err)
+
+	result := LoadAgentsFromDir(dir, []string{"grep", "edit"})
+	require.Len(t, result, 1)
+	agent := result["agent"]
+	// grep and edit disabled, only view (from read_file) remains
+	assert.NotContains(t, agent.AllowedTools, "grep")
+	assert.NotContains(t, agent.AllowedTools, "edit")
+	assert.Contains(t, agent.AllowedTools, "view")
+}
+
+func TestResolveAgentsDir_EnvOverrides(t *testing.T) {
+	envDir := t.TempDir()
+	restore := setEnv("CRUSH_AGENTS_DIR", envDir)
+	defer restore()
+
+	cfg := &Config{Options: &Options{AgentsDir: "/other/path"}}
+	got := resolveAgentsDir(cfg)
+	assert.Equal(t, envDir, got)
+}
+
+func TestResolveAgentsDir_OptionsAgentsDir(t *testing.T) {
+	restore := setEnv("CRUSH_AGENTS_DIR", "")
+	defer restore()
+
+	cfg := &Config{Options: &Options{AgentsDir: "/custom/agents"}}
+	got := resolveAgentsDir(cfg)
+	assert.Equal(t, "/custom/agents", got)
+}
+
+func TestResolveAgentsDir_ExpandTilde(t *testing.T) {
+	restore := setEnv("CRUSH_AGENTS_DIR", "")
+	defer restore()
+
+	cfg := &Config{Options: &Options{AgentsDir: "~/.custom-agents"}}
+	got := resolveAgentsDir(cfg)
+	// Should expand ~ to home dir
+	assert.NotContains(t, got, "~")
+	assert.Contains(t, got, ".custom-agents")
+}
+
+func TestResolveAgentsDir_Default(t *testing.T) {
+	restore := setEnv("CRUSH_AGENTS_DIR", "")
+	defer restore()
+
+	cfg := &Config{Options: nil}
+	got := resolveAgentsDir(cfg)
+	assert.NotEmpty(t, got)
+	assert.Contains(t, got, ".andy-code")
+	assert.Contains(t, got, "agents")
+}
+
+func setEnv(key, value string) func() {
+	old := os.Getenv(key)
+	if value != "" {
+		os.Setenv(key, value)
+	} else {
+		os.Unsetenv(key)
+	}
+	return func() {
+		if old != "" {
+			os.Setenv(key, old)
+		} else {
+			os.Unsetenv(key)
+		}
+	}
+}

@@ -274,6 +274,7 @@ type Options struct {
 	AguiServer                *AguiServerOptions   `json:"agui_server,omitempty" jsonschema:"description=AG-UI server configuration options"`
 	Bash                      *BashOptions        `json:"bash,omitempty" jsonschema:"description=Bash tool security options for allowing otherwise blocked commands"`
 	DisableNotifications      bool                 `json:"disable_notifications,omitempty" jsonschema:"description=Disable desktop notifications,default=false"`
+	AgentsDir                 string               `json:"agents_dir,omitempty" jsonschema:"description=Directory for loading agent modes from *.toml files (e.g. ~/.andy-code/agents)"`
 }
 
 // BashOptions holds security options for the bash tool.
@@ -373,6 +374,9 @@ type Agent struct {
 
 	// Overrides the context paths for this agent
 	ContextPaths []string `json:"context_paths,omitempty"`
+
+	// SystemPrompt overrides the default coder template when non-empty (e.g. from agents/*.toml)
+	SystemPrompt string `json:"system_prompt,omitempty"`
 }
 
 type Tools struct {
@@ -527,6 +531,14 @@ func (c *Config) SetCompactMode(enabled bool) error {
 	}
 	c.Options.TUI.CompactMode = enabled
 	return c.SetConfigField("options.tui.compact_mode", enabled)
+}
+
+func (c *Config) SetActiveMode(modeID string) error {
+	if c.Options == nil {
+		c.Options = &Options{}
+	}
+	c.Options.ActiveMode = modeID
+	return c.SetConfigField("options.active_mode", modeID)
 }
 
 func (c *Config) Resolve(key string) (string, error) {
@@ -836,6 +848,24 @@ func (c *Config) SetupAgents() {
 
 	// Load and merge modes from TOML (modes.toml) - overrides built-in
 	c.Agents = LoadModesFromTOML(c.workingDir, agents, c.Options.DisabledTools)
+
+	// Load and merge from agents/*.toml directory if configured
+	agentsDir := resolveAgentsDir(c)
+	if agentsDir != "" {
+		if _, err := os.Stat(agentsDir); err == nil {
+			disabled := c.Options.DisabledTools
+			if disabled == nil {
+				disabled = []string{}
+			}
+			fromDir := LoadAgentsFromDir(agentsDir, disabled)
+			for id, a := range fromDir {
+				if c.Options.ContextPaths != nil {
+					a.ContextPaths = c.Options.ContextPaths
+				}
+				c.Agents[id] = a
+			}
+		}
+	}
 }
 
 func (c *Config) Resolver() VariableResolver {

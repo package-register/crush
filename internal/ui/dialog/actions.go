@@ -42,6 +42,11 @@ type ActionSelectModel struct {
 	ReAuthenticate bool
 }
 
+// ActionSelectMode is a message indicating an agent mode has been selected.
+type ActionSelectMode struct {
+	ModeID string
+}
+
 // Messages for commands
 type (
 	ActionNewSession        struct{}
