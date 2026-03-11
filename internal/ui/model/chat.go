@@ -4,9 +4,9 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/crush/internal/ui/anim"
 	"github.com/charmbracelet/crush/internal/ui/chat"
 	"github.com/charmbracelet/crush/internal/ui/common"
 	"github.com/charmbracelet/crush/internal/ui/list"
@@ -37,10 +37,12 @@ type Chat struct {
 	list     *list.List
 	idInxMap map[string]int // Map of message IDs to their indices in the list
 
-	// Animation visibility optimization: track animations paused due to items
+	// Spinner routing: maps spinner ID (int) to list index for TickMsg routing.
+	spinnerIDToIndex map[int]int
+	// Animation visibility optimization: track spinner IDs paused due to items
 	// being scrolled out of view. When items become visible again, their
 	// animations are restarted.
-	pausedAnimations map[string]struct{}
+	pausedSpinnerIDs map[int]struct{}
 
 	// Mouse state
 	mouseDown     bool
@@ -71,7 +73,8 @@ func NewChat(com *common.Common) *Chat {
 	c := &Chat{
 		com:              com,
 		idInxMap:         make(map[string]int),
-		pausedAnimations: make(map[string]struct{}),
+		spinnerIDToIndex: make(map[int]int),
+		pausedSpinnerIDs: make(map[int]struct{}),
 	}
 	l := list.NewList()
 	l.SetGap(1)
@@ -110,15 +113,23 @@ func (m *Chat) Len() int {
 // SetMessages sets the chat messages to the provided list of message items.
 func (m *Chat) SetMessages(msgs ...chat.MessageItem) {
 	m.idInxMap = make(map[string]int)
-	m.pausedAnimations = make(map[string]struct{})
+	m.spinnerIDToIndex = make(map[int]int)
+	m.pausedSpinnerIDs = make(map[int]struct{})
 
 	items := make([]list.Item, len(msgs))
 	for i, msg := range msgs {
 		m.idInxMap[msg.ID()] = i
+		// Register spinner IDs for animatable items.
+		if animatable, ok := msg.(chat.Animatable); ok && animatable.SpinnerID() > 0 {
+			m.spinnerIDToIndex[animatable.SpinnerID()] = i
+		}
 		// Register nested tool IDs for tools that contain nested tools.
 		if container, ok := msg.(chat.NestedToolContainer); ok {
 			for _, nested := range container.NestedTools() {
 				m.idInxMap[nested.ID()] = i
+				if animatable, ok := nested.(chat.Animatable); ok && animatable.SpinnerID() > 0 {
+					m.spinnerIDToIndex[animatable.SpinnerID()] = i
+				}
 			}
 		}
 		items[i] = msg
@@ -133,10 +144,17 @@ func (m *Chat) AppendMessages(msgs ...chat.MessageItem) {
 	indexOffset := m.list.Len()
 	for i, msg := range msgs {
 		m.idInxMap[msg.ID()] = indexOffset + i
+		// Register spinner IDs for animatable items.
+		if animatable, ok := msg.(chat.Animatable); ok && animatable.SpinnerID() > 0 {
+			m.spinnerIDToIndex[animatable.SpinnerID()] = indexOffset + i
+		}
 		// Register nested tool IDs for tools that contain nested tools.
 		if container, ok := msg.(chat.NestedToolContainer); ok {
 			for _, nested := range container.NestedTools() {
 				m.idInxMap[nested.ID()] = indexOffset + i
+				if animatable, ok := nested.(chat.Animatable); ok && animatable.SpinnerID() > 0 {
+					m.spinnerIDToIndex[animatable.SpinnerID()] = indexOffset + i
+				}
 			}
 		}
 		items[i] = msg
@@ -162,17 +180,25 @@ func (m *Chat) UpdateNestedToolIDs(containerID string) {
 		return
 	}
 
-	// Register all nested tool IDs to point to the container's index.
+	// Register all nested tool IDs and spinner IDs to point to the container's index.
 	for _, nested := range container.NestedTools() {
 		m.idInxMap[nested.ID()] = idx
+		if animatable, ok := nested.(chat.Animatable); ok && animatable.SpinnerID() > 0 {
+			m.spinnerIDToIndex[animatable.SpinnerID()] = idx
+		}
 	}
 }
 
 // Animate animates items in the chat list. Only propagates animation messages
-// to visible items to save CPU. When items are not visible, their animation ID
+// to visible items to save CPU. When items are not visible, their spinner ID
 // is tracked so it can be restarted when they become visible again.
-func (m *Chat) Animate(msg anim.StepMsg) tea.Cmd {
-	idx, ok := m.idInxMap[msg.ID]
+func (m *Chat) Animate(msg tea.Msg) tea.Cmd {
+	tickMsg, ok := msg.(spinner.TickMsg)
+	if !ok {
+		return nil
+	}
+
+	idx, ok := m.spinnerIDToIndex[tickMsg.ID]
 	if !ok {
 		return nil
 	}
@@ -189,30 +215,29 @@ func (m *Chat) Animate(msg anim.StepMsg) tea.Cmd {
 	if !isVisible {
 		// Item not visible - pause animation by not propagating.
 		// Track it so we can restart when it becomes visible.
-		m.pausedAnimations[msg.ID] = struct{}{}
+		m.pausedSpinnerIDs[tickMsg.ID] = struct{}{}
 		return nil
 	}
 
 	// Item is visible - remove from paused set and animate.
-	delete(m.pausedAnimations, msg.ID)
+	delete(m.pausedSpinnerIDs, tickMsg.ID)
 	return animatable.Animate(msg)
 }
 
 // RestartPausedVisibleAnimations restarts animations for items that were paused
 // due to being scrolled out of view but are now visible again.
 func (m *Chat) RestartPausedVisibleAnimations() tea.Cmd {
-	if len(m.pausedAnimations) == 0 {
+	if len(m.pausedSpinnerIDs) == 0 {
 		return nil
 	}
 
 	startIdx, endIdx := m.list.VisibleItemIndices()
 	var cmds []tea.Cmd
 
-	for id := range m.pausedAnimations {
-		idx, ok := m.idInxMap[id]
+	for spinnerID := range m.pausedSpinnerIDs {
+		idx, ok := m.spinnerIDToIndex[spinnerID]
 		if !ok {
-			// Item no longer exists.
-			delete(m.pausedAnimations, id)
+			delete(m.pausedSpinnerIDs, spinnerID)
 			continue
 		}
 
@@ -223,7 +248,7 @@ func (m *Chat) RestartPausedVisibleAnimations() tea.Cmd {
 					cmds = append(cmds, cmd)
 				}
 			}
-			delete(m.pausedAnimations, id)
+			delete(m.pausedSpinnerIDs, spinnerID)
 		}
 	}
 
@@ -437,7 +462,8 @@ func (m *Chat) SelectLastInView() {
 // ClearMessages removes all messages from the chat list.
 func (m *Chat) ClearMessages() {
 	m.idInxMap = make(map[string]int)
-	m.pausedAnimations = make(map[string]struct{})
+	m.spinnerIDToIndex = make(map[int]int)
+	m.pausedSpinnerIDs = make(map[int]struct{})
 	m.list.SetItems()
 	m.ClearMouse()
 }
@@ -455,15 +481,21 @@ func (m *Chat) RemoveMessage(id string) {
 	// Remove from index map
 	delete(m.idInxMap, id)
 
-	// Rebuild index map for all items after the removed one
+	// Rebuild index map for all items after the removed one (indices shifted down)
 	for i := idx; i < m.list.Len(); i++ {
 		if item, ok := m.list.ItemAt(i).(chat.MessageItem); ok {
 			m.idInxMap[item.ID()] = i
 		}
 	}
-
-	// Clean up any paused animations for this message
-	delete(m.pausedAnimations, id)
+	// Remove spinner IDs for the deleted item and shift indices for items that moved
+	for sid, i := range m.spinnerIDToIndex {
+		if i == idx {
+			delete(m.spinnerIDToIndex, sid)
+			delete(m.pausedSpinnerIDs, sid)
+		} else if i > idx {
+			m.spinnerIDToIndex[sid] = i - 1
+		}
+	}
 }
 
 // MessageItem returns the message item with the given ID, or nil if not found.

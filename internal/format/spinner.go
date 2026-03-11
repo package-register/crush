@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/crush/internal/ui/anim"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -17,13 +18,24 @@ type Spinner struct {
 	prog *tea.Program
 }
 
-type model struct {
-	cancel context.CancelFunc
-	anim   *anim.Anim
+// SpinnerOptions configures the CLI spinner.
+type SpinnerOptions struct {
+	// Style sets the spinner's lipgloss style (e.g. foreground color).
+	Style lipgloss.Style
+	// Label is the text shown next to the spinner (e.g. "Generating").
+	Label string
 }
 
-func (m model) Init() tea.Cmd  { return m.anim.Start() }
-func (m model) View() tea.View { return tea.NewView(m.anim.Render()) }
+type model struct {
+	cancel  context.CancelFunc
+	spinner spinner.Model
+	label   string
+}
+
+func (m model) Init() tea.Cmd { return m.spinner.Tick }
+func (m model) View() tea.View {
+	return tea.NewView(m.spinner.View() + " " + m.label)
+}
 
 // Update implements tea.Model.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -34,18 +46,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cancel()
 			return m, tea.Quit
 		}
-	case anim.StepMsg:
-		cmd := m.anim.Animate(msg)
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	}
 	return m, nil
 }
 
-// NewSpinner creates a new spinner with the given message
-func NewSpinner(ctx context.Context, cancel context.CancelFunc, animSettings anim.Settings) *Spinner {
+// NewSpinner creates a new spinner for non-interactive CLI mode.
+func NewSpinner(ctx context.Context, cancel context.CancelFunc, opts SpinnerOptions) *Spinner {
+	s := spinner.New(
+		spinner.WithSpinner(spinner.Dot),
+		spinner.WithStyle(opts.Style),
+	)
+	label := opts.Label
+	if label == "" {
+		label = "Generating"
+	}
 	m := model{
-		anim:   anim.New(animSettings),
-		cancel: cancel,
+		spinner: s,
+		label:   label,
+		cancel:  cancel,
 	}
 
 	p := tea.NewProgram(m, tea.WithOutput(os.Stderr), tea.WithContext(ctx))

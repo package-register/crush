@@ -36,7 +36,6 @@ import (
 	"github.com/charmbracelet/crush/internal/pubsub"
 	"github.com/charmbracelet/crush/internal/session"
 	"github.com/charmbracelet/crush/internal/shell"
-	"github.com/charmbracelet/crush/internal/ui/anim"
 	"github.com/charmbracelet/crush/internal/ui/styles"
 	"github.com/charmbracelet/crush/internal/update"
 	"github.com/charmbracelet/crush/internal/version"
@@ -215,13 +214,9 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 		}
 		defaultFG := lipgloss.LightDark(hasDarkBG)(charmtone.Pepper, t.FgBase)
 
-		spinner = format.NewSpinner(ctx, cancel, anim.Settings{
-			Size:        10,
-			Label:       "Generating",
-			LabelColor:  defaultFG,
-			GradColorA:  t.Primary,
-			GradColorB:  t.Secondary,
-			CycleColors: true,
+		spinner = format.NewSpinner(ctx, cancel, format.SpinnerOptions{
+			Style: lipgloss.NewStyle().Foreground(defaultFG),
+			Label: "Generating",
 		})
 		spinner.Start()
 	}

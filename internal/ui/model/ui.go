@@ -38,7 +38,6 @@ import (
 	"github.com/charmbracelet/crush/internal/permission"
 	"github.com/charmbracelet/crush/internal/pubsub"
 	"github.com/charmbracelet/crush/internal/session"
-	"github.com/charmbracelet/crush/internal/ui/anim"
 	"github.com/charmbracelet/crush/internal/ui/attachments"
 	"github.com/charmbracelet/crush/internal/ui/chat"
 	"github.com/charmbracelet/crush/internal/ui/common"
@@ -749,7 +748,13 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-	case anim.StepMsg:
+	case spinner.TickMsg:
+		if m.dialog.HasDialogs() {
+			// route to dialog
+			if cmd := m.handleDialogMsg(msg); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
 		if m.state == uiChat {
 			if cmd := m.chat.Animate(msg); cmd != nil {
 				cmds = append(cmds, cmd)
@@ -758,13 +763,6 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if cmd := m.chat.ScrollToBottomAndAnimate(); cmd != nil {
 					cmds = append(cmds, cmd)
 				}
-			}
-		}
-	case spinner.TickMsg:
-		if m.dialog.HasDialogs() {
-			// route to dialog
-			if cmd := m.handleDialogMsg(msg); cmd != nil {
-				cmds = append(cmds, cmd)
 			}
 		}
 		if m.state == uiChat && m.hasSession() && hasInProgressTodo(m.session.Todos) && m.todoIsSpinning {
