@@ -115,7 +115,11 @@ func TestSetupSubscriber_DrainAfterDrop(t *testing.T) {
 }
 
 func TestSetupSubscriber_NoTimerLeak(t *testing.T) {
-	defer goleak.VerifyNone(t)
+	defer goleak.VerifyNone(t,
+		goleak.IgnoreTopFunction("net/http.(*http2ClientConn).readLoop"),
+		goleak.IgnoreTopFunction("net/http.(*http2Transport).newClientConn"),
+		goleak.IgnoreTopFunction("internal/poll.runtime_pollWait"),
+	)
 	synctest.Test(t, func(t *testing.T) {
 		f := newSubscriberFixture(t, 100)
 

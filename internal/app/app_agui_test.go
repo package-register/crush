@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/crush/internal/agui-server"
+	aguiserver "github.com/charmbracelet/crush/internal/agui-server"
 	"github.com/charmbracelet/crush/internal/config"
 	"github.com/charmbracelet/crush/internal/csync"
 	_ "modernc.org/sqlite"

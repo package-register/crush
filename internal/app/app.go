@@ -21,7 +21,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/crush/internal/agent"
 	"github.com/charmbracelet/crush/internal/agent/tools/mcp"
-	"github.com/charmbracelet/crush/internal/agui-server"
+	aguiserver "github.com/charmbracelet/crush/internal/agui-server"
 	"github.com/charmbracelet/crush/internal/config"
 	"github.com/charmbracelet/crush/internal/db"
 	"github.com/charmbracelet/crush/internal/event"
@@ -471,7 +471,14 @@ func setupSubscriber[T any](
 		subCh := subscriber(ctx)
 		sendTimer := time.NewTimer(0)
 		<-sendTimer.C
-		defer sendTimer.Stop()
+		defer func() {
+			if !sendTimer.Stop() {
+				select {
+				case <-sendTimer.C:
+				default:
+				}
+			}
+		}()
 
 		for {
 			select {
