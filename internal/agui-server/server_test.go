@@ -12,8 +12,8 @@ import (
 
 func TestServer_Start(t *testing.T) {
 	config := ServerConfig{
-		Port:       18080, // Use different port to avoid conflicts
-		BasePath:   "/agui",
+		Port:        18080, // Use different port to avoid conflicts
+		BasePath:    "/agui",
 		CORSOrigins: []string{"*"},
 	}
 	srv := NewServer(config)
@@ -67,7 +67,6 @@ func TestServer_Stop(t *testing.T) {
 
 	ctx := context.Background()
 	err := srv.Stop(ctx)
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -317,11 +316,11 @@ func TestServer_HandleRun_GenerateIDs(t *testing.T) {
 
 func TestServer_withCORS(t *testing.T) {
 	tests := []struct {
-		name          string
-		corsOrigins   []string
-		requestOrigin string
-		method        string
-		expectCORS    bool
+		name            string
+		corsOrigins     []string
+		requestOrigin   string
+		method          string
+		expectCORS      bool
 		expectNoContent bool
 	}{
 		{
@@ -353,11 +352,11 @@ func TestServer_withCORS(t *testing.T) {
 			expectCORS:    false,
 		},
 		{
-			name:          "options request",
-			corsOrigins:   []string{"*"},
-			requestOrigin: "http://example.com",
-			method:        http.MethodOptions,
-			expectCORS:    true,
+			name:            "options request",
+			corsOrigins:     []string{"*"},
+			requestOrigin:   "http://example.com",
+			method:          http.MethodOptions,
+			expectCORS:      true,
 			expectNoContent: true,
 		},
 	}
@@ -435,13 +434,13 @@ func TestMustMarshalPanic(t *testing.T) {
 	// Test that mustMarshal panics on unmarshalable data
 	// Create a channel which cannot be marshaled
 	ch := make(chan int)
-	
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic for unmarshalable data")
 		}
 	}()
-	
+
 	mustMarshal(ch)
 }
 

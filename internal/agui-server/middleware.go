@@ -9,10 +9,10 @@ import (
 
 // RateLimitConfig holds the configuration for rate limiting.
 type RateLimitConfig struct {
-	GlobalQPS      float64 // Global queries per second limit
-	GlobalBurst    float64 // Global burst size
-	SessionQPS     float64 // Per-session queries per second limit
-	SessionBurst   float64 // Per-session burst size
+	GlobalQPS      float64       // Global queries per second limit
+	GlobalBurst    float64       // Global burst size
+	SessionQPS     float64       // Per-session queries per second limit
+	SessionBurst   float64       // Per-session burst size
 	RequestTimeout time.Duration // Request ID tracking timeout
 }
 

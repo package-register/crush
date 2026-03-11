@@ -37,9 +37,9 @@ func TestRateLimitMiddleware(t *testing.T) {
 // TestExtractSessionID tests session ID extraction from various sources.
 func TestExtractSessionID(t *testing.T) {
 	tests := []struct {
-		name       string
-		setupReq   func() *http.Request
-		expectID   string
+		name     string
+		setupReq func() *http.Request
+		expectID string
 	}{
 		{
 			name: "query_parameter_sessionId",
@@ -115,9 +115,9 @@ func TestExtractSessionID(t *testing.T) {
 // TestExtractRequestID tests request ID extraction from various sources.
 func TestExtractRequestID(t *testing.T) {
 	tests := []struct {
-		name       string
-		setupReq   func() *http.Request
-		expectID   string
+		name     string
+		setupReq func() *http.Request
+		expectID string
 	}{
 		{
 			name: "header_X-Request-ID",
@@ -561,18 +561,18 @@ func BenchmarkRateLimitMiddleware(b *testing.B) {
 // TestRateLimiter_SetCapacity tests SetCapacity function.
 func TestRateLimiter_SetCapacity(t *testing.T) {
 	limiter := NewRateLimiter(10, 10)
-	
+
 	// First exhaust the initial capacity
 	for i := 0; i < 10; i++ {
 		limiter.Allow("session1")
 	}
-	
+
 	// Set new capacity
 	limiter.SetCapacity("session1", 50)
-	
+
 	// Give time for tokens to refill (rate is 10 QPS, so 0.1s = 1 token)
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// Should allow more requests now
 	allowed := 0
 	for i := 0; i < 50; i++ {
@@ -580,7 +580,7 @@ func TestRateLimiter_SetCapacity(t *testing.T) {
 			allowed++
 		}
 	}
-	
+
 	// Should have allowed some requests (at least 2 with 200ms at 10 QPS)
 	if allowed < 2 {
 		t.Errorf("Expected at least 2 requests allowed after SetCapacity, got %d", allowed)
@@ -590,12 +590,12 @@ func TestRateLimiter_SetCapacity(t *testing.T) {
 // TestTokenBucket_AllowN tests AllowN function.
 func TestTokenBucket_AllowN(t *testing.T) {
 	bucket := NewTokenBucket(100, 100)
-	
+
 	// AllowN should work for valid n
 	if !bucket.AllowN(10) {
 		t.Error("AllowN(10) should succeed with full bucket")
 	}
-	
+
 	// AllowN should fail for n > capacity
 	if bucket.AllowN(200) {
 		t.Error("AllowN(200) should fail when n > capacity")

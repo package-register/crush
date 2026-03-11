@@ -93,12 +93,12 @@ func TestHandler_HandleRun(t *testing.T) {
 
 	// Wait for async execution and verify with proper synchronization
 	time.Sleep(50 * time.Millisecond)
-	
+
 	// Verify agent executor was called (with proper synchronization)
 	agentExecutor.mu.Lock()
 	executed := agentExecutor.executed
 	agentExecutor.mu.Unlock()
-	
+
 	if !executed {
 		t.Error("Expected agent executor to be called")
 	}

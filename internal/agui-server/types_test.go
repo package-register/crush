@@ -58,8 +58,8 @@ func TestDefaultServerConfig(t *testing.T) {
 
 func TestServerCreation(t *testing.T) {
 	config := ServerConfig{
-		Port:       9090,
-		BasePath:   "/api/agui",
+		Port:        9090,
+		BasePath:    "/api/agui",
 		CORSOrigins: []string{"http://localhost:3000"},
 	}
 

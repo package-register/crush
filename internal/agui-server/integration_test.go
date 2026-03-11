@@ -517,7 +517,7 @@ func BenchmarkSSEThroughput(b *testing.B) {
 			ThreadID: "bench-thread",
 			RunID:    fmt.Sprintf("bench-run-%d", i),
 		})
-		
+
 		// Send event directly without streaming
 		handler.sendEvent(w, event)
 	}
@@ -633,7 +633,7 @@ func TestConnectionManagerStress(t *testing.T) {
 	if count > numOps {
 		t.Errorf("Expected at most %d connections, got %d", numOps, count)
 	}
-	
+
 	// Clean up any remaining connections
 	manager.CloseAll()
 }

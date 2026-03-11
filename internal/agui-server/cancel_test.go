@@ -13,7 +13,7 @@ import (
 
 // mockCanceler is a mock implementation of Canceler and AgentExecutor for testing.
 type mockCanceler struct {
-	mu            sync.Mutex
+	mu              sync.Mutex
 	canceledThreads map[string]bool
 	cancelError     error
 	executeFunc     func(ctx context.Context, req RunRequest) error
@@ -31,11 +31,11 @@ func newMockCanceler() *mockCanceler {
 func (m *mockCanceler) Cancel(ctx context.Context, threadID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.cancelError != nil {
 		return m.cancelError
 	}
-	
+
 	m.canceledThreads[threadID] = true
 	return nil
 }
@@ -47,7 +47,7 @@ func (m *mockCanceler) Execute(ctx context.Context, req RunRequest) error {
 func (m *mockCanceler) getCanceledThreads() map[string]bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	result := make(map[string]bool)
 	for k, v := range m.canceledThreads {
 		result[k] = v
@@ -76,7 +76,7 @@ func TestHandleCancel_Success(t *testing.T) {
 		Messages: []Message{{Role: "user", Content: "test"}},
 	}
 	body, _ := json.Marshal(reqBody)
-	
+
 	req := httptest.NewRequest(http.MethodPost, "/agui/cancel", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -99,7 +99,7 @@ func TestHandleCancel_SessionNotFound(t *testing.T) {
 	// Setup
 	mock := newMockCanceler()
 	mock.setCancelError(ErrRunNotFound)
-	
+
 	handler := &Handler{
 		config:        DefaultServerConfig(),
 		eventEmitter:  nil,
@@ -111,7 +111,7 @@ func TestHandleCancel_SessionNotFound(t *testing.T) {
 		Messages: []Message{{Role: "user", Content: "test"}},
 	}
 	body, _ := json.Marshal(reqBody)
-	
+
 	req := httptest.NewRequest(http.MethodPost, "/agui/cancel", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -186,7 +186,7 @@ func TestHandleCancel_MissingThreadID(t *testing.T) {
 		Messages: []Message{{Role: "user", Content: "test"}},
 	}
 	body, _ := json.Marshal(reqBody)
-	
+
 	req := httptest.NewRequest(http.MethodPost, "/agui/cancel", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -234,7 +234,7 @@ func TestHandleCancel_NoCancelerSupport(t *testing.T) {
 		Messages: []Message{{Role: "user", Content: "test"}},
 	}
 	body, _ := json.Marshal(reqBody)
-	
+
 	req := httptest.NewRequest(http.MethodPost, "/agui/cancel", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -265,13 +265,13 @@ func TestHandleCancel_Concurrent(t *testing.T) {
 	for i := 0; i < numRequests; i++ {
 		go func(idx int) {
 			defer wg.Done()
-			
+
 			reqBody := RunRequest{
 				ThreadID: "thread-" + string(rune('0'+idx)),
 				Messages: []Message{{Role: "user", Content: "test"}},
 			}
 			body, _ := json.Marshal(reqBody)
-			
+
 			req := httptest.NewRequest(http.MethodPost, "/agui/cancel", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
@@ -293,7 +293,7 @@ func TestHandleCancel_ServerError(t *testing.T) {
 	// Setup
 	mock := newMockCanceler()
 	mock.setCancelError(errors.New("internal server error"))
-	
+
 	handler := &Handler{
 		config:        DefaultServerConfig(),
 		eventEmitter:  nil,
@@ -305,7 +305,7 @@ func TestHandleCancel_ServerError(t *testing.T) {
 		Messages: []Message{{Role: "user", Content: "test"}},
 	}
 	body, _ := json.Marshal(reqBody)
-	
+
 	req := httptest.NewRequest(http.MethodPost, "/agui/cancel", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -354,7 +354,7 @@ func TestCancelHandler_Unregister(t *testing.T) {
 	handler := NewCancelHandler(canceler)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Register and unregister
 	handler.Register("thread-1", ctx, cancel)
 	handler.Unregister("thread-1")
@@ -381,7 +381,7 @@ func TestCancelHandler_ConcurrentAccess(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			threadID := "thread-" + string(rune(idx%10))
-			
+
 			ctx, cancel := context.WithCancel(context.Background())
 			handler.Register(threadID, ctx, cancel)
 			handler.Unregister(threadID)
@@ -400,7 +400,7 @@ func TestCancelHandler_ConcurrentAccess(t *testing.T) {
 func BenchmarkCancelHandler_Register(b *testing.B) {
 	canceler := newMockCanceler()
 	handler := NewCancelHandler(canceler)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -415,7 +415,7 @@ func BenchmarkCancelHandler_Register(b *testing.B) {
 func BenchmarkCancelHandler_IsRunning(b *testing.B) {
 	canceler := newMockCanceler()
 	handler := NewCancelHandler(canceler)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	handler.Register("thread-1", ctx, cancel)
 	defer handler.Unregister("thread-1")

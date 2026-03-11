@@ -11,11 +11,11 @@ func TestSnapshotManager_CreateSnapshot(t *testing.T) {
 	sm := NewSnapshotManager(config)
 
 	tests := []struct {
-		name      string
-		threadID  string
-		messages  []Message
-		wantErr   bool
-		errMsg    string
+		name     string
+		threadID string
+		messages []Message
+		wantErr  bool
+		errMsg   string
 	}{
 		{
 			name:     "valid snapshot",

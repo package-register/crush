@@ -89,7 +89,7 @@ func TestHandler_NilRequest(t *testing.T) {
 func TestHandler_NilEventEmitter(t *testing.T) {
 	config := DefaultServerConfig()
 	agentExecutor := &MockAgentExecutor{}
-	
+
 	// Create handler with nil event emitter
 	handler := NewHandler(config, nil, agentExecutor)
 
@@ -117,7 +117,7 @@ func TestHandler_NilEventEmitter(t *testing.T) {
 func TestHandler_NilAgentExecutor(t *testing.T) {
 	config := DefaultServerConfig()
 	eventEmitter := &MockEventEmitter{}
-	
+
 	// Create handler with nil agent executor
 	handler := NewHandler(config, eventEmitter, nil)
 
@@ -484,10 +484,10 @@ func TestSSEHandler_ContextDeadline(t *testing.T) {
 // TestEventDecoder_InvalidJSON tests decoding of invalid JSON.
 func TestEventDecoder_InvalidJSON(t *testing.T) {
 	invalidJSON := []byte(`{invalid json}`)
-	
+
 	var event Event
 	err := json.Unmarshal(invalidJSON, &event)
-	
+
 	if err == nil {
 		t.Error("Expected error for invalid JSON")
 	}
@@ -604,7 +604,7 @@ func TestBroadcastToConnection_NilConnection(t *testing.T) {
 	handler := NewSSEHandler(config, manager)
 
 	event := NewEvent(RunStarted, RunStartedEvent{})
-	
+
 	err := handler.BroadcastToConnection("nonexistent", event)
 	if err == nil {
 		t.Error("Expected error for nonexistent connection")
@@ -717,9 +717,9 @@ func TestSSEWriter_UnicodeData(t *testing.T) {
 // TestSSEHandler_QueryParameters tests various query parameter combinations.
 func TestSSEHandler_QueryParameters(t *testing.T) {
 	tests := []struct {
-		name       string
-		query      string
-		expectGen  bool // expect generated IDs
+		name      string
+		query     string
+		expectGen bool // expect generated IDs
 	}{
 		{"both provided", "?threadId=t1&runId=r1", false},
 		{"thread only", "?threadId=t1", false},
@@ -759,7 +759,7 @@ func TestSSEHandler_QueryParameters(t *testing.T) {
 func TestConnection_Cleanup(t *testing.T) {
 	manager := NewConnectionManager()
 	conn := NewConnection("test-conn", "test-thread", "test-run")
-	
+
 	manager.Add(conn)
 	if manager.Count() != 1 {
 		t.Errorf("Expected 1 connection, got %d", manager.Count())
@@ -903,12 +903,12 @@ func TestSSEHandler_setSSEHeaders_Complete(t *testing.T) {
 	headers := w.Header()
 
 	expectedHeaders := map[string]string{
-		"Content-Type":                   "text/event-stream",
-		"Cache-Control":                  "no-cache",
-		"Connection":                     "keep-alive",
-		"Access-Control-Allow-Origin":    "*",
-		"Access-Control-Allow-Methods":   "GET, OPTIONS",
-		"Access-Control-Allow-Headers":   "Content-Type",
+		"Content-Type":                 "text/event-stream",
+		"Cache-Control":                "no-cache",
+		"Connection":                   "keep-alive",
+		"Access-Control-Allow-Origin":  "*",
+		"Access-Control-Allow-Methods": "GET, OPTIONS",
+		"Access-Control-Allow-Headers": "Content-Type",
 	}
 
 	for header, expected := range expectedHeaders {
@@ -1017,7 +1017,7 @@ func TestHandler_OptionsMethod(t *testing.T) {
 // TestWithCORS_EmptyConfig tests WithCORS with empty config.
 func TestWithCORS_EmptyConfig(t *testing.T) {
 	config := CORSConfig{}
-	
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

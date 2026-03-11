@@ -642,7 +642,7 @@ func TestSSEHandler_BroadcastToConnection_ClosedConnection(t *testing.T) {
 	defer manager.Remove(conn.ID)
 
 	event := NewEvent(RunStarted, RunStartedEvent{})
-	
+
 	// When connection is closed, the select should go to the <-conn.Done case
 	// and return an error. However, due to Go's select behavior with multiple
 	// ready channels, we need to ensure the done channel is checked.
@@ -652,9 +652,9 @@ func TestSSEHandler_BroadcastToConnection_ClosedConnection(t *testing.T) {
 			t.Errorf("Unexpected panic: %v", r)
 		}
 	}()
-	
+
 	err := handler.BroadcastToConnection("test-conn", event)
-	
+
 	// Error may or may not be returned depending on select behavior
 	_ = err
 }

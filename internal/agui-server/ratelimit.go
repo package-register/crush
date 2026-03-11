@@ -106,9 +106,9 @@ func (b *TokenBucket) Reset() {
 
 // RateLimiter manages rate limiters for multiple keys (e.g., sessions, IPs).
 type RateLimiter struct {
-	mu          sync.RWMutex
-	limiters    map[string]*TokenBucket
-	defaultQPS  float64
+	mu           sync.RWMutex
+	limiters     map[string]*TokenBucket
+	defaultQPS   float64
 	defaultBurst float64
 }
 
@@ -117,8 +117,8 @@ type RateLimiter struct {
 // defaultBurst: default burst size for new keys
 func NewRateLimiter(defaultQPS, defaultBurst float64) *RateLimiter {
 	return &RateLimiter{
-		limiters:    make(map[string]*TokenBucket),
-		defaultQPS:  defaultQPS,
+		limiters:     make(map[string]*TokenBucket),
+		defaultQPS:   defaultQPS,
 		defaultBurst: defaultBurst,
 	}
 }
@@ -244,12 +244,12 @@ func (rt *RequestTracker) Remove(requestID string) {
 // cleanupLoop periodically removes expired request IDs.
 func (rt *RequestTracker) cleanupLoop() {
 	defer rt.wg.Done()
-	
+
 	// Handle zero or negative cleanup interval
 	if rt.cleanupT <= 0 {
 		return
 	}
-	
+
 	ticker := time.NewTicker(rt.cleanupT)
 	defer ticker.Stop()
 

@@ -483,8 +483,8 @@ func int64Ptr(i int64) *int64 {
 // Table-driven tests for event builders
 func TestEventBuilders_TableDriven(t *testing.T) {
 	tests := []struct {
-		name      string
-		buildFunc func() Event
+		name       string
+		buildFunc  func() Event
 		expectType EventType
 	}{
 		{

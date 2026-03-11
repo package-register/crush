@@ -13,11 +13,11 @@ type EventType string
 // AG-UI event type constants (17 event types).
 const (
 	// Lifecycle events.
-	RunStarted        EventType = "RUN_STARTED"
-	RunFinished       EventType = "RUN_FINISHED"
-	RunError          EventType = "RUN_ERROR"
-	StepStarted       EventType = "STEP_STARTED"
-	StepFinished      EventType = "STEP_FINISHED"
+	RunStarted   EventType = "RUN_STARTED"
+	RunFinished  EventType = "RUN_FINISHED"
+	RunError     EventType = "RUN_ERROR"
+	StepStarted  EventType = "STEP_STARTED"
+	StepFinished EventType = "STEP_FINISHED"
 
 	// Text message events.
 	TextMessageStart   EventType = "TEXT_MESSAGE_START"
@@ -25,10 +25,10 @@ const (
 	TextMessageEnd     EventType = "TEXT_MESSAGE_END"
 
 	// Tool call events.
-	ToolCallStart    EventType = "TOOL_CALL_START"
-	ToolCallArgs     EventType = "TOOL_CALL_ARGS"
-	ToolCallEnd      EventType = "TOOL_CALL_END"
-	ToolCallResult   EventType = "TOOL_CALL_RESULT"
+	ToolCallStart  EventType = "TOOL_CALL_START"
+	ToolCallArgs   EventType = "TOOL_CALL_ARGS"
+	ToolCallEnd    EventType = "TOOL_CALL_END"
+	ToolCallResult EventType = "TOOL_CALL_RESULT"
 
 	// State management events.
 	StateDelta EventType = "STATE_DELTA"

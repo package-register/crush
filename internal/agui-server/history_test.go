@@ -630,8 +630,6 @@ func TestHistoryStore_NonExistentThread(t *testing.T) {
 	}
 }
 
-
-
 func TestHandler_WithHistoryService(t *testing.T) {
 	handler := &Handler{
 		config:        DefaultServerConfig(),

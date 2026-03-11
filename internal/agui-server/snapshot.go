@@ -18,13 +18,13 @@ type Snapshot struct {
 
 // SnapshotManager manages snapshots for all threads.
 type SnapshotManager struct {
-	mu            sync.RWMutex
-	snapshots     map[string]*Snapshot
-	maxSnapshots  int
-	maxMessages   int
+	mu               sync.RWMutex
+	snapshots        map[string]*Snapshot
+	maxSnapshots     int
+	maxMessages      int
 	snapshotInterval time.Duration
-	stopChan      chan struct{}
-	ticker        *time.Ticker
+	stopChan         chan struct{}
+	ticker           *time.Ticker
 }
 
 // SnapshotManagerConfig holds configuration for the SnapshotManager.

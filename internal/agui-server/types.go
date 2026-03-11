@@ -68,8 +68,8 @@ type ServerConfig struct {
 // DefaultServerConfig returns a ServerConfig with default values.
 func DefaultServerConfig() ServerConfig {
 	return ServerConfig{
-		Port:       8080,
-		BasePath:   "/agui",
+		Port:        8080,
+		BasePath:    "/agui",
 		CORSOrigins: []string{"*"},
 	}
 }

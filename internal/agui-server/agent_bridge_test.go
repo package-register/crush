@@ -35,15 +35,15 @@ func (m *MockCoordinator) CancelAll()              {}
 func (m *MockCoordinator) IsSessionBusy(sessionID string) bool {
 	return false
 }
-func (m *MockCoordinator) IsBusy() bool                                   { return false }
-func (m *MockCoordinator) QueuedPrompts(sessionID string) int             { return 0 }
-func (m *MockCoordinator) QueuedPromptsList(sessionID string) []string    { return nil }
-func (m *MockCoordinator) ClearQueue(sessionID string)                    {}
+func (m *MockCoordinator) IsBusy() bool                                { return false }
+func (m *MockCoordinator) QueuedPrompts(sessionID string) int          { return 0 }
+func (m *MockCoordinator) QueuedPromptsList(sessionID string) []string { return nil }
+func (m *MockCoordinator) ClearQueue(sessionID string)                 {}
 func (m *MockCoordinator) Summarize(ctx context.Context, sessionID string) error {
 	return nil
 }
-func (m *MockCoordinator) Model() agent.Model { return agent.Model{} }
-func (m *MockCoordinator) UpdateModels(ctx context.Context) error       { return nil }
+func (m *MockCoordinator) Model() agent.Model                     { return agent.Model{} }
+func (m *MockCoordinator) UpdateModels(ctx context.Context) error { return nil }
 
 func TestNewAgentBridge(t *testing.T) {
 	coordinator := &MockCoordinator{}
@@ -79,7 +79,6 @@ func TestAgentBridge_Execute_Success(t *testing.T) {
 
 	ctx := context.Background()
 	err := bridge.Execute(ctx, req)
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -219,7 +218,6 @@ func TestAgentBridge_processAgentResult_EmptyResult(t *testing.T) {
 
 	result := &fantasy.AgentResult{}
 	err := bridge.processAgentResult("thread", "run", result)
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -334,7 +332,6 @@ func TestSimpleEventEmitter_Emit(t *testing.T) {
 
 	event := NewEvent(RunStarted, RunStartedEvent{})
 	err := emitter.Emit(event)
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -369,7 +366,6 @@ func TestSimpleEventEmitter_EmitToThread(t *testing.T) {
 
 	event := NewEvent(RunStarted, RunStartedEvent{})
 	err := emitter.EmitToThread("thread1", event)
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -406,7 +402,6 @@ func TestSimpleEventEmitter_EmitToConnection(t *testing.T) {
 
 	event := NewEvent(RunStarted, RunStartedEvent{})
 	err := emitter.EmitToConnection("conn1", event)
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -474,7 +469,7 @@ func TestSimpleEventEmitter_EmitToConnection_ClosedConnection(t *testing.T) {
 	defer manager.Remove(conn.ID)
 
 	event := NewEvent(RunStarted, RunStartedEvent{})
-	
+
 	// When connection is closed, the select should go to the <-conn.Done case
 	// and return an error. However, due to Go's select behavior with multiple
 	// ready channels, we need to ensure the done channel is checked.
@@ -485,9 +480,9 @@ func TestSimpleEventEmitter_EmitToConnection_ClosedConnection(t *testing.T) {
 			t.Errorf("Unexpected panic: %v", r)
 		}
 	}()
-	
+
 	err := emitter.EmitToConnection("conn1", event)
-	
+
 	// Error may or may not be returned depending on select behavior
 	_ = err
 }
@@ -731,5 +726,3 @@ func TestSimpleEventEmitter_FullChannel(t *testing.T) {
 		t.Error("Expected error when channel is full")
 	}
 }
-
-

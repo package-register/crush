@@ -223,5 +223,3 @@ func (h *SSEHandler) BroadcastToAll(event Event) int {
 
 	return count
 }
-
-
