@@ -153,7 +153,20 @@ func testSessionAgent(env fakeEnv, large, small fantasy.LanguageModel, systemPro
 			DefaultMaxTokens: 10000,
 		},
 	}
-	agent := NewSessionAgent(SessionAgentOptions{LargeModel: largeModel, SmallModel: smallModel, SystemPromptPrefix: "", SystemPrompt: systemPrompt, IsSubAgent: false, DisableAutoSummarize: false, IsYolo: true, Sessions: env.sessions, Messages: env.messages, Tools: tools, ToolCallFormat: "standard"})
+	agent := NewSessionAgent(SessionAgentOptions{
+		LargeModel:           largeModel,
+		SmallModel:           smallModel,
+		SystemPromptPrefix:   "",
+		SystemPrompt:         systemPrompt,
+		IsSubAgent:          false,
+		DisableAutoSummarize: false,
+		IsYolo:               true,
+		Sessions:             env.sessions,
+		Messages:             env.messages,
+		Tools:                tools,
+		ToolCallFormat:       "standard",
+		Notify:               nil,
+	})
 	return agent
 }
 

@@ -254,45 +254,38 @@ func (Attribution) JSONSchemaExtend(schema *jsonschema.Schema) {
 }
 
 type Options struct {
-	ActiveMode                string             `json:"active_mode,omitempty" jsonschema:"description=Active agent mode (coder, task, git, rust, plan, or custom from modes.toml),default=coder"`
-	ToolCallFormat            string             `json:"tool_call_format,omitempty" jsonschema:"description=Tool call format from model output: standard (API structured) or longcat (XML tags in text),default=standard"`
-	ContextPaths              []string           `json:"context_paths,omitempty" jsonschema:"description=Paths to files containing context information for the AI,example=.cursorrules,example=CRUSH.md"`
-	SkillsPaths               []string           `json:"skills_paths,omitempty" jsonschema:"description=Paths to directories containing Agent Skills (folders with SKILL.md files),example=~/.config/crush/skills,example=./skills"`
-	TUI                       *TUIOptions        `json:"tui,omitempty" jsonschema:"description=Terminal user interface options"`
-	Debug                     bool               `json:"debug,omitempty" jsonschema:"description=Enable debug logging,default=false"`
-	DebugLSP                  bool               `json:"debug_lsp,omitempty" jsonschema:"description=Enable debug logging for LSP servers,default=false"`
-	DisableAutoSummarize      bool               `json:"disable_auto_summarize,omitempty" jsonschema:"description=Disable automatic conversation summarization,default=false"`
-	DataDirectory             string             `json:"data_directory,omitempty" jsonschema:"description=Directory for storing application data (relative to working directory),default=.crush,example=.crush"` // Relative to the cwd
-	DisabledTools             []string           `json:"disabled_tools,omitempty" jsonschema:"description=List of built-in tools to disable and hide from the agent,example=bash,example=sourcegraph"`
-	DisableProviderAutoUpdate bool               `json:"disable_provider_auto_update,omitempty" jsonschema:"description=Disable providers auto-update,default=false"`
-	DisableDefaultProviders   bool               `json:"disable_default_providers,omitempty" jsonschema:"description=Ignore all default/embedded providers. When enabled, providers must be fully specified in the config file with base_url, models, and api_key - no merging with defaults occurs,default=false"`
-	Attribution               *Attribution       `json:"attribution,omitempty" jsonschema:"description=Attribution settings for generated content"`
-	DisableMetrics            bool               `json:"disable_metrics,omitempty" jsonschema:"description=Disable sending metrics,default=false"`
-	InitializeAs              string             `json:"initialize_as,omitempty" jsonschema:"description=Name of the context file to create/update during project initialization,default=AGENTS.md,example=AGENTS.md,example=CRUSH.md,example=CLAUDE.md,example=docs/LLMs.md"`
-	AutoLSP                   *bool              `json:"auto_lsp,omitempty" jsonschema:"description=Automatically setup LSPs based on root markers,default=true"`
-	Progress                  *bool              `json:"progress,omitempty" jsonschema:"description=Show indeterminate progress updates during long operations,default=true"`
-	AguiServer                *AguiServerOptions `json:"agui_server,omitempty" jsonschema:"description=AG-UI server configuration options"`
-	Bash                      *BashOptions       `json:"bash,omitempty" jsonschema:"description=Bash tool security options for allowing otherwise blocked commands"`
+	ActiveMode                string               `json:"active_mode,omitempty" jsonschema:"description=Active agent mode (coder, task, git, rust, plan, or custom from modes.toml),default=coder"`
+	ToolCallFormat            string               `json:"tool_call_format,omitempty" jsonschema:"description=Tool call format from model output: standard (API structured) or longcat (XML tags in text),default=standard"`
+	ContextPaths              []string             `json:"context_paths,omitempty" jsonschema:"description=Paths to files containing context information for the AI,example=.cursorrules,example=CRUSH.md"`
+	SkillsPaths               []string             `json:"skills_paths,omitempty" jsonschema:"description=Paths to directories containing Agent Skills (folders with SKILL.md files),example=~/.config/crush/skills,example=./skills"`
+	TUI                       *TUIOptions          `json:"tui,omitempty" jsonschema:"description=Terminal user interface options"`
+	Debug                     bool                 `json:"debug,omitempty" jsonschema:"description=Enable debug logging,default=false"`
+	DebugLSP                  bool                 `json:"debug_lsp,omitempty" jsonschema:"description=Enable debug logging for LSP servers,default=false"`
+	DisableAutoSummarize      bool                 `json:"disable_auto_summarize,omitempty" jsonschema:"description=Disable automatic conversation summarization,default=false"`
+	DataDirectory             string               `json:"data_directory,omitempty" jsonschema:"description=Directory for storing application data (relative to working directory),default=.crush,example=.crush"`
+	DisabledTools             []string             `json:"disabled_tools,omitempty" jsonschema:"description=List of built-in tools to disable and hide from the agent,example=bash,example=sourcegraph"`
+	DisableProviderAutoUpdate bool                 `json:"disable_provider_auto_update,omitempty" jsonschema:"description=Disable providers auto-update,default=false"`
+	DisableDefaultProviders   bool                 `json:"disable_default_providers,omitempty" jsonschema:"description=Ignore all default/embedded providers. When enabled, providers must be fully specified in the config file with base_url, models, and api_key - no merging with defaults occurs,default=false"`
+	Attribution               *Attribution         `json:"attribution,omitempty" jsonschema:"description=Attribution settings for generated content"`
+	DisableMetrics            bool                 `json:"disable_metrics,omitempty" jsonschema:"description=Disable sending metrics,default=false"`
+	InitializeAs              string               `json:"initialize_as,omitempty" jsonschema:"description=Name of the context file to create/update during project initialization,default=AGENTS.md,example=AGENTS.md,example=CRUSH.md,example=CLAUDE.md,example=docs/LLMs.md"`
+	AutoLSP                   *bool                `json:"auto_lsp,omitempty" jsonschema:"description=Automatically setup LSPs based on root markers,default=true"`
+	Progress                  *bool                `json:"progress,omitempty" jsonschema:"description=Show indeterminate progress updates during long operations,default=true"`
+	AguiServer                *AguiServerOptions   `json:"agui_server,omitempty" jsonschema:"description=AG-UI server configuration options"`
+	Bash                      *BashOptions        `json:"bash,omitempty" jsonschema:"description=Bash tool security options for allowing otherwise blocked commands"`
+	DisableNotifications      bool                 `json:"disable_notifications,omitempty" jsonschema:"description=Disable desktop notifications,default=false"`
 }
 
 // BashOptions holds security options for the bash tool.
 type BashOptions struct {
-	// AllowedCommands lists command patterns that would otherwise be blocked.
-	// Format: "cmd subcommand" or "cmd subcommand flag", e.g. "go install", "go test -exec".
-	// Only affects package-manager-style blockers (go install, npm install, etc.);
-	// dangerous commands (sudo, ssh, curl, etc.) remain blocked.
 	AllowedCommands []string `json:"allowed_commands,omitempty" jsonschema:"description=Command patterns to allow despite default blocks,example=go install,example=npm install -g"`
 }
 
 // AguiServerOptions holds the configuration for the AG-UI server.
 type AguiServerOptions struct {
-	// Enabled indicates whether the AG-UI server is enabled.
-	Enabled *bool `json:"enabled,omitempty" jsonschema:"description=Whether the AG-UI server is enabled,default=false"`
-	// Port is the port the AG-UI server listens on.
-	Port int `json:"port,omitempty" jsonschema:"description=Port the AG-UI server listens on,default=8080,minimum=1,maximum=65535"`
-	// BasePath is the base path for AG-UI server endpoints.
-	BasePath string `json:"base_path,omitempty" jsonschema:"description=Base path for AG-UI server endpoints,default=/agui,format=uri-path"`
-	// CORSOrigins is a list of allowed CORS origins.
+	Enabled     *bool    `json:"enabled,omitempty" jsonschema:"description=Whether the AG-UI server is enabled,default=false"`
+	Port        int      `json:"port,omitempty" jsonschema:"description=Port the AG-UI server listens on,default=8080,minimum=1,maximum=65535"`
+	BasePath    string   `json:"base_path,omitempty" jsonschema:"description=Base path for AG-UI server endpoints,default=/agui,format=uri-path"`
 	CORSOrigins []string `json:"cors_origins,omitempty" jsonschema:"description=List of allowed CORS origins for the AG-UI server"`
 }
 

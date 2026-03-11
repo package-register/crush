@@ -20,6 +20,7 @@ import (
 	"charm.land/fantasy"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/crush/internal/agent"
+	"github.com/charmbracelet/crush/internal/agent/notify"
 	"github.com/charmbracelet/crush/internal/agent/tools/mcp"
 	aguiserver "github.com/charmbracelet/crush/internal/agui-server"
 	"github.com/charmbracelet/crush/internal/config"
@@ -72,8 +73,9 @@ type App struct {
 	tuiWG           *sync.WaitGroup
 
 	// global context and cleanup functions
-	globalCtx    context.Context
-	cleanupFuncs []func(context.Context) error
+	globalCtx          context.Context
+	cleanupFuncs       []func(context.Context) error
+	agentNotifications *pubsub.Broker[notify.Notification]
 }
 
 // New initializes a new application instance.
@@ -100,9 +102,10 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 
 		config: cfg,
 
-		events:          make(chan tea.Msg, 100),
-		serviceEventsWG: &sync.WaitGroup{},
-		tuiWG:           &sync.WaitGroup{},
+		events:             make(chan tea.Msg, 100),
+		serviceEventsWG:    &sync.WaitGroup{},
+		tuiWG:              &sync.WaitGroup{},
+		agentNotifications: pubsub.NewBroker[notify.Notification](),
 	}
 
 	// Initialize AG-UI server if enabled
@@ -135,7 +138,7 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 	app.cleanupFuncs = append(
 		app.cleanupFuncs,
 		func(context.Context) error { return conn.Close() },
-		mcp.Close,
+		func(ctx context.Context) error { return mcp.Close(ctx) },
 	)
 
 	// TODO: remove the concept of agent config, most likely.
@@ -164,6 +167,11 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 // Config returns the application configuration.
 func (app *App) Config() *config.Config {
 	return app.config
+}
+
+// AgentNotifications returns the broker for agent notification events.
+func (app *App) AgentNotifications() *pubsub.Broker[notify.Notification] {
+	return app.agentNotifications
 }
 
 // RunNonInteractive runs the application in non-interactive mode with the
@@ -236,18 +244,7 @@ func (app *App) RunNonInteractive(ctx context.Context, output io.Writer, prompt,
 
 	defer stopSpinner()
 
-	const maxPromptLengthForTitle = 100
-	const titlePrefix = "Non-interactive: "
-	var titleSuffix string
-
-	if len(prompt) > maxPromptLengthForTitle {
-		titleSuffix = prompt[:maxPromptLengthForTitle] + "..."
-	} else {
-		titleSuffix = prompt
-	}
-	title := titlePrefix + titleSuffix
-
-	sess, err := app.Sessions.Create(ctx, title)
+	sess, err := app.Sessions.Create(ctx, agent.DefaultSessionName)
 	if err != nil {
 		return fmt.Errorf("failed to create session for non-interactive mode: %w", err)
 	}
@@ -448,6 +445,7 @@ func (app *App) setupEvents() {
 	setupSubscriber(ctx, app.serviceEventsWG, "permissions", app.Permissions.Subscribe, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "permissions-notifications", app.Permissions.SubscribeNotifications, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "history", app.History.Subscribe, app.events)
+	setupSubscriber(ctx, app.serviceEventsWG, "agent-notifications", app.agentNotifications.Subscribe, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "mcp", mcp.SubscribeEvents, app.events)
 	setupSubscriber(ctx, app.serviceEventsWG, "lsp", SubscribeLSPEvents, app.events)
 	cleanupFunc := func(context.Context) error {
@@ -527,6 +525,7 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 		app.History,
 		app.FileTracker,
 		app.LSPManager,
+		app.agentNotifications,
 	)
 	if err != nil {
 		slog.Error("Failed to create coder agent", "err", err)

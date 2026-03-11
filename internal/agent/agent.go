@@ -33,19 +33,22 @@ import (
 	"charm.land/fantasy/providers/vercel"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/crush/internal/agent/hyper"
+	"github.com/charmbracelet/crush/internal/agent/notify"
 	"github.com/charmbracelet/crush/internal/agent/tools"
 	"github.com/charmbracelet/crush/internal/agent/tools/mcp"
 	"github.com/charmbracelet/crush/internal/config"
 	"github.com/charmbracelet/crush/internal/csync"
 	"github.com/charmbracelet/crush/internal/message"
 	"github.com/charmbracelet/crush/internal/permission"
+	"github.com/charmbracelet/crush/internal/pubsub"
 	"github.com/charmbracelet/crush/internal/session"
 	"github.com/charmbracelet/crush/internal/stringext"
+	"github.com/charmbracelet/crush/internal/version"
 	"github.com/charmbracelet/x/exp/charmtone"
 )
 
 const (
-	defaultSessionName = "Untitled Session"
+	DefaultSessionName = "Untitled Session"
 
 	// Constants for auto-summarization thresholds
 	largeContextWindowThreshold = 200_000
@@ -73,6 +76,7 @@ type SessionAgentCall struct {
 	TopK             *int64
 	FrequencyPenalty *float64
 	PresencePenalty  *float64
+	NonInteractive   bool
 }
 
 type SessionAgent interface {
@@ -110,6 +114,7 @@ type sessionAgent struct {
 	disableAutoSummarize bool
 	isYolo               bool
 	toolCallFormat       string
+	notify               pubsub.Publisher[notify.Notification]
 
 	messageQueue   *csync.Map[string, []SessionAgentCall]
 	activeRequests *csync.Map[string, context.CancelFunc]
@@ -128,6 +133,7 @@ type SessionAgentOptions struct {
 	Tools                []fantasy.AgentTool
 	// ToolCallFormat: "standard" (default) or "longcat" for <longcat_tool_call> in text
 	ToolCallFormat string
+	Notify               pubsub.Publisher[notify.Notification]
 }
 
 func NewSessionAgent(
@@ -149,6 +155,7 @@ func NewSessionAgent(
 		tools:                csync.NewSliceFrom(opts.Tools),
 		isYolo:               opts.IsYolo,
 		toolCallFormat:       toolCallFormat,
+		notify:               opts.Notify,
 		messageQueue:         csync.NewMap[string, []SessionAgentCall](),
 		activeRequests:       csync.NewMap[string, context.CancelFunc](),
 	}
@@ -203,6 +210,7 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 		largeModel.Model,
 		fantasy.WithSystemPrompt(systemPrompt),
 		fantasy.WithTools(agentTools...),
+		fantasy.WithUserAgent("Charm Crush/"+version.Version),
 	)
 
 	sessionLock := sync.Mutex{}
@@ -562,6 +570,16 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 		return nil, err
 	}
 
+	// Send notification that agent has finished its turn (skip for
+	// nested/non-interactive sessions).
+	if !call.NonInteractive && a.notify != nil {
+		a.notify.Publish(pubsub.CreatedEvent, notify.Notification{
+			SessionID:    call.SessionID,
+			SessionTitle: currentSession.Title,
+			Type:         notify.TypeAgentFinished,
+		})
+	}
+
 	if shouldSummarize {
 		a.activeRequests.Del(call.SessionID)
 		if summarizeErr := a.Summarize(genCtx, call.SessionID, call.ProviderOptions); summarizeErr != nil {
@@ -624,6 +642,7 @@ func (a *sessionAgent) Summarize(ctx context.Context, sessionID string, opts fan
 
 	agent := fantasy.NewAgent(largeModel.Model,
 		fantasy.WithSystemPrompt(string(summaryPrompt)),
+		fantasy.WithUserAgent("Charm Crush/"+version.Version),
 	)
 	summaryMessage, err := a.messages.Create(ctx, sessionID, message.CreateMessageParams{
 		Role:             message.Assistant,
@@ -819,6 +838,7 @@ func (a *sessionAgent) generateTitle(ctx context.Context, sessionID string, user
 		return fantasy.NewAgent(m,
 			fantasy.WithSystemPrompt(string(p)+"\n /no_think"),
 			fantasy.WithMaxOutputTokens(tok),
+			fantasy.WithUserAgent("Charm Crush/"+version.Version),
 		)
 	}
 
@@ -854,7 +874,7 @@ func (a *sessionAgent) generateTitle(ctx context.Context, sessionID string, user
 			// Welp, the large model didn't work either. Use the default
 			// session name and return.
 			slog.Error("Error generating title with large model", "err", err)
-			saveErr := a.sessions.UpdateTitleAndUsage(ctx, sessionID, defaultSessionName, 0, 0, 0)
+			saveErr := a.sessions.UpdateTitleAndUsage(ctx, sessionID, DefaultSessionName, 0, 0, 0)
 			if saveErr != nil {
 				slog.Error("Failed to save session title and usage", "error", saveErr)
 			}
@@ -866,7 +886,7 @@ func (a *sessionAgent) generateTitle(ctx context.Context, sessionID string, user
 		// Actually, we didn't get a response so we can't. Use the default
 		// session name and return.
 		slog.Error("Response is nil; can't generate title")
-		saveErr := a.sessions.UpdateTitleAndUsage(ctx, sessionID, defaultSessionName, 0, 0, 0)
+		saveErr := a.sessions.UpdateTitleAndUsage(ctx, sessionID, DefaultSessionName, 0, 0, 0)
 		if saveErr != nil {
 			slog.Error("Failed to save session title and usage", "error", saveErr)
 		}
@@ -881,7 +901,7 @@ func (a *sessionAgent) generateTitle(ctx context.Context, sessionID string, user
 	title = thinkTagRegex.ReplaceAllString(title, "")
 
 	title = strings.TrimSpace(title)
-	title = cmp.Or(title, defaultSessionName)
+	title = cmp.Or(title, DefaultSessionName)
 
 	// Calculate usage and cost.
 	var openrouterCost *float64

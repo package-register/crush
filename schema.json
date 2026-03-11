@@ -504,23 +504,11 @@
         "bash": {
           "$ref": "#/$defs/BashOptions",
           "description": "Bash tool security options for allowing otherwise blocked commands"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "BashOptions": {
-      "properties": {
-        "allowed_commands": {
-          "items": {
-            "type": "string",
-            "examples": [
-              "go install",
-              "npm install -g"
-            ]
-          },
-          "type": "array",
-          "description": "Command patterns to allow despite default blocks"
+        },
+        "disable_notifications": {
+          "type": "boolean",
+          "description": "Disable desktop notifications",
+          "default": false
         }
       },
       "additionalProperties": false,

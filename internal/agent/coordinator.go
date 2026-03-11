@@ -20,6 +20,7 @@ import (
 	"charm.land/catwalk/pkg/catwalk"
 	"charm.land/fantasy"
 	"github.com/charmbracelet/crush/internal/agent/hyper"
+	"github.com/charmbracelet/crush/internal/agent/notify"
 	"github.com/charmbracelet/crush/internal/agent/prompt"
 	"github.com/charmbracelet/crush/internal/agent/tools"
 	"github.com/charmbracelet/crush/internal/config"
@@ -30,6 +31,7 @@ import (
 	"github.com/charmbracelet/crush/internal/message"
 	"github.com/charmbracelet/crush/internal/oauth/copilot"
 	"github.com/charmbracelet/crush/internal/permission"
+	"github.com/charmbracelet/crush/internal/pubsub"
 	"github.com/charmbracelet/crush/internal/session"
 	"golang.org/x/sync/errgroup"
 
@@ -46,12 +48,21 @@ import (
 )
 
 const (
-	// subAgentTimeout is the default timeout for sub-agent execution.
-	subAgentTimeout = 10 * time.Minute
-	// subAgentMaxRetries is the maximum number of retries for network errors.
+	subAgentTimeout    = 10 * time.Minute
 	subAgentMaxRetries = 2
-	// subAgentRetryDelay is the initial delay between retries.
 	subAgentRetryDelay = 1 * time.Second
+)
+
+// Coordinator errors.
+var (
+	errCoderAgentNotConfigured         = errors.New("coder agent not configured")
+	errModelProviderNotConfigured      = errors.New("model provider not configured")
+	errLargeModelNotSelected           = errors.New("large model not selected")
+	errSmallModelNotSelected           = errors.New("small model not selected")
+	errLargeModelProviderNotConfigured = errors.New("large model provider not configured")
+	errSmallModelProviderNotConfigured = errors.New("small model provider not configured")
+	errLargeModelNotFound              = errors.New("large model not found in provider config")
+	errSmallModelNotFound              = errors.New("small model not found in provider config")
 )
 
 type Coordinator interface {
@@ -78,6 +89,7 @@ type coordinator struct {
 	history     history.Service
 	filetracker filetracker.Service
 	lspManager  *lsp.Manager
+	notify      pubsub.Publisher[notify.Notification]
 
 	currentAgent SessionAgent
 	agents       map[string]SessionAgent
@@ -94,6 +106,7 @@ func NewCoordinator(
 	history history.Service,
 	filetracker filetracker.Service,
 	lspManager *lsp.Manager,
+	notify pubsub.Publisher[notify.Notification],
 ) (Coordinator, error) {
 	c := &coordinator{
 		cfg:         cfg,
@@ -103,6 +116,7 @@ func NewCoordinator(
 		history:     history,
 		filetracker: filetracker,
 		lspManager:  lspManager,
+		notify:      notify,
 		agents:      make(map[string]SessionAgent),
 	}
 
@@ -112,10 +126,9 @@ func NewCoordinator(
 	}
 	agentCfg, ok := cfg.Agents[activeMode]
 	if !ok {
-		// Fallback to coder if active mode not found
 		agentCfg, ok = cfg.Agents[config.AgentCoder]
 		if !ok {
-			return nil, errors.New("coder agent not configured")
+			return nil, errCoderAgentNotConfigured
 		}
 	}
 
@@ -163,7 +176,7 @@ func (c *coordinator) Run(ctx context.Context, sessionID string, prompt string, 
 
 	providerCfg, ok := c.cfg.Providers.Get(model.ModelCfg.Provider)
 	if !ok {
-		return nil, errors.New("model provider not configured")
+		return nil, errModelProviderNotConfigured
 	}
 
 	mergedOptions, temp, topP, topK, freqPenalty, presPenalty := mergeCallOptions(model, providerCfg)
@@ -401,6 +414,7 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 		Messages:             c.messages,
 		Tools:                nil,
 		ToolCallFormat:       toolCallFormat,
+		Notify:               c.notify,
 	})
 
 	c.readyWg.Go(func() error {
@@ -520,16 +534,16 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent) ([]fan
 func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Model, Model, error) {
 	largeModelCfg, ok := c.cfg.Models[config.SelectedModelTypeLarge]
 	if !ok {
-		return Model{}, Model{}, errors.New("large model not selected")
+		return Model{}, Model{}, errLargeModelNotSelected
 	}
 	smallModelCfg, ok := c.cfg.Models[config.SelectedModelTypeSmall]
 	if !ok {
-		return Model{}, Model{}, errors.New("small model not selected")
+		return Model{}, Model{}, errSmallModelNotSelected
 	}
 
 	largeProviderCfg, ok := c.cfg.Providers.Get(largeModelCfg.Provider)
 	if !ok {
-		return Model{}, Model{}, errors.New("large model provider not configured")
+		return Model{}, Model{}, errLargeModelProviderNotConfigured
 	}
 
 	largeProvider, err := c.buildProvider(largeProviderCfg, largeModelCfg, isSubAgent)
@@ -539,7 +553,7 @@ func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 
 	smallProviderCfg, ok := c.cfg.Providers.Get(smallModelCfg.Provider)
 	if !ok {
-		return Model{}, Model{}, errors.New("small model provider not configured")
+		return Model{}, Model{}, errSmallModelProviderNotConfigured
 	}
 
 	smallProvider, err := c.buildProvider(smallProviderCfg, smallModelCfg, true)
@@ -562,11 +576,11 @@ func (c *coordinator) buildAgentModels(ctx context.Context, isSubAgent bool) (Mo
 	}
 
 	if largeCatwalkModel == nil {
-		return Model{}, Model{}, errors.New("large model not found in provider config")
+		return Model{}, Model{}, errLargeModelNotFound
 	}
 
 	if smallCatwalkModel == nil {
-		return Model{}, Model{}, errors.New("small model not found in provider config")
+		return Model{}, Model{}, errSmallModelNotFound
 	}
 
 	largeModelID := largeModelCfg.Model
@@ -798,19 +812,8 @@ func (c *coordinator) isAnthropicThinking(model config.SelectedModel) bool {
 	if model.Think {
 		return true
 	}
-
-	if model.ProviderOptions == nil {
-		return false
-	}
-
 	opts, err := anthropic.ParseOptions(model.ProviderOptions)
-	if err != nil {
-		return false
-	}
-	if opts.Thinking != nil {
-		return true
-	}
-	return false
+	return err == nil && opts.Thinking != nil
 }
 
 func (c *coordinator) buildProvider(providerCfg config.ProviderConfig, model config.SelectedModel, isSubAgent bool) (fantasy.Provider, error) {
@@ -915,7 +918,7 @@ func (c *coordinator) UpdateModels(ctx context.Context) error {
 		agentCfg, ok = c.cfg.Agents[config.AgentCoder]
 	}
 	if !ok {
-		return errors.New("coder agent not configured")
+		return errCoderAgentNotConfigured
 	}
 
 	tools, err := c.buildTools(ctx, agentCfg)
@@ -937,7 +940,7 @@ func (c *coordinator) QueuedPromptsList(sessionID string) []string {
 func (c *coordinator) Summarize(ctx context.Context, sessionID string) error {
 	providerCfg, ok := c.cfg.Providers.Get(c.currentAgent.Model().ModelCfg.Provider)
 	if !ok {
-		return errors.New("model provider not configured")
+		return errModelProviderNotConfigured
 	}
 	return c.currentAgent.Summarize(ctx, sessionID, getProviderOptions(c.currentAgent.Model(), providerCfg))
 }
@@ -1016,23 +1019,20 @@ func (c *coordinator) runSubAgent(ctx context.Context, params subAgentParams) (f
 	providerCfg, ok := c.cfg.Providers.Get(model.ModelCfg.Provider)
 	if !ok {
 		slog.Error("Sub-agent provider not configured", "session_id", session.ID, "provider", model.ModelCfg.Provider)
-		return fantasy.ToolResponse{}, NewSubAgentError("get_provider", session.ID, errors.New("model provider not configured"))
+		return fantasy.ToolResponse{}, NewSubAgentError("get_provider", session.ID, errModelProviderNotConfigured)
 	}
 
-	// Create timeout context for sub-agent execution
 	subAgentCtx, cancel := context.WithTimeout(ctx, subAgentTimeout)
 	defer cancel()
 
 	slog.Info("Starting sub-agent execution", "session_id", session.ID, "timeout", subAgentTimeout, "max_retries", subAgentMaxRetries)
 
-	// Run the agent with retry logic for network errors
 	var result *fantasy.AgentResult
 	var runErr error
 	var attempt int
 
 	for attempt = 0; attempt <= subAgentMaxRetries; attempt++ {
 		if attempt > 0 {
-			// Calculate retry delay with exponential backoff
 			delay := subAgentRetryDelay * time.Duration(1<<uint(attempt-1))
 			slog.Warn("Retrying sub-agent execution", "session_id", session.ID, "attempt", attempt, "max_retries", subAgentMaxRetries, "delay", delay, "error", runErr)
 			select {
@@ -1054,24 +1054,23 @@ func (c *coordinator) runSubAgent(ctx context.Context, params subAgentParams) (f
 			TopK:             model.ModelCfg.TopK,
 			FrequencyPenalty: model.ModelCfg.FrequencyPenalty,
 			PresencePenalty:  model.ModelCfg.PresencePenalty,
+			NonInteractive:   true,
 		})
 
 		if runErr == nil {
 			slog.Debug("Sub-agent execution succeeded", "session_id", session.ID, "attempt", attempt+1)
-			break // Success
+			break
 		}
 
-		// Check if error is retryable (network-related)
 		if !c.isRetryableError(runErr) {
 			slog.Debug("Sub-agent execution failed with non-retryable error", "session_id", session.ID, "error", runErr)
-			break // Non-retryable error
+			break
 		}
 
 		slog.Warn("Sub-agent execution failed with retryable error", "session_id", session.ID, "attempt", attempt+1, "error", runErr)
 	}
 
 	if runErr != nil {
-		// Log the final error with full context
 		slog.Error("Sub-agent execution failed after all retries", "session_id", session.ID, "parent_session", params.SessionID, "error", runErr, "total_attempts", attempt)
 		return fantasy.NewTextErrorResponse(formatSubAgentError(runErr)), nil
 	}
