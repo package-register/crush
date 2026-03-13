@@ -17,12 +17,20 @@ This example demonstrates how to connect to an AG-UI server using SSE (Server-Se
 
 ### 1. Start the AG-UI Server
 
-First, make sure your AG-UI server is running:
+Ensure Crush is running with AG-UI enabled. Add to `crush.json`:
 
-```bash
-# Example: Start Crush with AG-UI enabled
-crush --agui --agui-port 8080
+```json
+{
+  "options": {
+    "agui_server": {
+      "enabled": true,
+      "port": 8080
+    }
+  }
+}
 ```
+
+Or use TUI: `/` → **Configure AGUI Server**.
 
 ### 2. Run the Client
 
@@ -121,12 +129,12 @@ agui-client/
 └── README.md        # This file
 ```
 
-## How It Works
+## How It Works (Crush Dual-Endpoint)
 
-1. **Connection**: The client connects to the AG-UI server via HTTP POST with SSE streaming
-2. **Request**: Sends a JSON payload with threadId, runId, and messages
-3. **Streaming**: Receives server-sent events in real-time
-4. **Parsing**: Parses SSE frames and extracts JSON events
+1. **SSE connection**: GET `/agui/sse?threadId=X&runId=Y` – establishes event stream
+2. **Trigger run**: POST `/agui/run` with `{threadId, runId, messages}` – starts agent
+3. **Streaming**: Events flow through the GET connection in real-time
+4. **Parsing**: Parses SSE frames (format: `{type, timestamp, data}`)
 5. **Display**: Formats and displays events to the console
 
 ## Request Format

@@ -1,9 +1,8 @@
-# Crush
+# Fromsko Code
 
 <p align="center">
-    <a href="https://stuff.charm.sh/crush/charm-crush.png"><img width="450" alt="Charm Crush Logo" src="https://github.com/user-attachments/assets/cf8ca3ce-8b02-43f0-9d0f-5a331488da4b" /></a><br />
-    <a href="https://github.com/charmbracelet/crush/releases"><img src="https://img.shields.io/github/release/charmbracelet/crush" alt="Latest Release"></a>
-    <a href="https://github.com/charmbracelet/crush/actions"><img src="https://github.com/charmbracelet/crush/actions/workflows/build.yml/badge.svg" alt="Build Status"></a>
+    <a href="https://github.com/fromsko/code/releases"><img src="https://img.shields.io/github/release/fromsko/code" alt="Latest Release"></a>
+    <a href="https://github.com/fromsko/code/actions"><img src="https://github.com/fromsko/code/actions/workflows/build.yml/badge.svg" alt="Build Status"></a>
 </p>
 
 <p align="center">Your new coding bestie, now available in your favourite terminal.<br />Your tools, your code, and your workflows, wired into your LLM of choice.</p>
@@ -19,7 +18,7 @@
 - **LSP-Enhanced:** Crush uses LSPs for additional context, just like you do
 - **Extensible:** add capabilities via MCPs (`http`, `stdio`, and `sse`)
 - **Works Everywhere:** first-class support in every terminal on macOS, Linux, Windows (PowerShell and WSL), Android, FreeBSD, OpenBSD, and NetBSD
-- **Industrial Grade:** built on the Charm ecosystem, powering 25k+ applications, from leading open source projects to business-critical infrastructure
+- **Industrial Grade:** robust and production-ready
 
 ## Installation
 
@@ -158,16 +157,16 @@ Or, download it:
 - [Packages][releases] are available in Debian and RPM formats
 - [Binaries][releases] are available for Linux, macOS, Windows, FreeBSD, OpenBSD, and NetBSD
 
-[releases]: https://github.com/charmbracelet/crush/releases
+[releases]: https://github.com/fromsko/code/releases
 
 Or just install it with Go:
 
 ```
-go install github.com/charmbracelet/crush@latest
+go install github.com/fromsko/code@latest
 ```
 
 > [!WARNING]
-> Productivity may increase when using Crush and you may find yourself nerd
+> Productivity may increase when using Fromsko Code and you may find yourself nerd
 > sniped when first using the application. If the symptoms persist, join the
 > [Discord][discord] and nerd snipe the rest of us.
 
@@ -224,8 +223,8 @@ Crush’s default model listing is managed in [Catwalk](https://github.com/charm
 
 ## Configuration
 
-Crush runs great with no configuration. That said, if you do need or want to
-customize Crush, configuration can be added either local to the project itself,
+Fromsko Code runs great with no configuration. That said, if you do need or want to
+customize Fromsko Code, configuration can be added either local to the project itself,
 or globally, with the following priority:
 
 1. `.crush.json`
@@ -241,7 +240,7 @@ Configuration itself is stored as a JSON object:
 }
 ```
 
-As an additional note, Crush also stores ephemeral data, such as application state, in one additional location:
+As an additional note, Fromsko Code also stores ephemeral data, such as application state, in one additional location:
 
 ```bash
 # Unix
@@ -659,7 +658,7 @@ Local models can also be configured via OpenAI-compatible API. Here are two comm
 
 ## Logging
 
-Sometimes you need to look at logs. Luckily, Crush logs all sorts of
+Sometimes you need to look at logs. Luckily, Fromsko Code logs all sorts of
 stuff. Logs are stored in `./.crush/logs/crush.log` relative to the project.
 
 The CLI also contains some helper commands to make perusing recent logs easier:
@@ -749,8 +748,8 @@ which maintainers rely on to inform development and support priorities. The
 metrics include solely usage metadata; prompts and responses are NEVER
 collected.
 
-Details on exactly what’s collected are in the source code ([here](https://github.com/charmbracelet/crush/tree/main/internal/event)
-and [here](https://github.com/charmbracelet/crush/blob/main/internal/llm/agent/event.go)).
+Details on exactly what’s collected are in the source code ([here](https://github.com/fromsko/code/tree/main/internal/event)
+and [here](https://github.com/fromsko/code/blob/main/internal/llm/agent/event.go)).
 
 You can opt out of metrics collection at any time by setting the environment
 variable by setting the following in your environment:
@@ -769,34 +768,14 @@ Or by setting the following in your config:
 }
 ```
 
-Crush also respects the `DO_NOT_TRACK` convention which can be enabled via
+Fromsko Code also respects the `DO_NOT_TRACK` convention which can be enabled via
 `export DO_NOT_TRACK=1`.
 
 ## Contributing
-
-See the [contributing guide](https://github.com/charmbracelet/crush?tab=contributing-ov-file#contributing).
-
+See the [contributing guide](https://github.com/fromsko/code?tab=contributing-ov-file#contributing).
 ## Whatcha think?
-
 We’d love to hear your thoughts on this project. Need help? We gotchu. You can find us on:
-
-- [Twitter](https://twitter.com/charmcli)
-- [Slack](https://charm.land/slack)
 - [Discord][discord]
-- [The Fediverse](https://mastodon.social/@charmcli)
-- [Bluesky](https://bsky.app/profile/charm.land)
-
-[discord]: https://charm.land/discord
-
 ## License
-
-[FSL-1.1-MIT](https://github.com/charmbracelet/crush/raw/main/LICENSE.md)
-
+[FSL-1.1-MIT](https://github.com/fromsko/code/raw/main/LICENSE.md)
 ---
-
-Part of [Charm](https://charm.land).
-
-<a href="https://charm.land/"><img alt="The Charm logo" width="400" src="https://stuff.charm.sh/charm-banner-next.jpg" /></a>
-
-<!--prettier-ignore-->
-Charm热爱开源 • Charm loves open source

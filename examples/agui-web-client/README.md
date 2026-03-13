@@ -27,12 +27,21 @@ npm install
 
 ### 2. Start the AG-UI Server
 
-Make sure your AG-UI server is running:
+Ensure Crush is running with AG-UI enabled. Add to `crush.json` in your project or `~/.config/crush/crush.json`:
 
-```bash
-# Example: Start Crush with AG-UI enabled
-crush --agui --agui-port 8080
+```json
+{
+  "options": {
+    "agui_server": {
+      "enabled": true,
+      "port": 8080,
+      "base_path": "/agui"
+    }
+  }
+}
 ```
+
+Or use the TUI: press `/` for command menu → **Configure AGUI Server**.
 
 ### 3. Start the Development Server
 
@@ -73,24 +82,30 @@ agui-web-client/
     └── index.css        # Global styles
 ```
 
+## Protocol (Crush Dual-Endpoint)
+
+Crush AG-UI uses two endpoints:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/agui/sse` | GET | SSE stream – receives events for a thread |
+| `/agui/run` | POST | Trigger run – sends messages, starts agent |
+
+Flow: 1) Connect GET `/agui/sse?threadId=X&runId=Y` 2) POST to `/agui/run` with `{threadId, runId, messages}` 3) Events stream over the GET connection.
+
 ## Core Components
 
 ### `agui.ts` - SSE Utilities
 
-Provides functions for streaming AG-UI events:
-
 ```typescript
-// Stream SSE events
-await streamAguiSse(endpoint, payload, {
+// Stream events (handles dual-endpoint flow internally)
+await streamAguiSse('http://localhost:8080/agui/sse', payload, {
   onEvent: (event) => { /* handle event */ },
   onError: (error) => { /* handle error */ },
   onComplete: () => { /* stream finished */ },
 });
 
-// Generate unique IDs
 const id = generateId('prefix');
-
-// Format events for display
 const text = formatEventText(event);
 ```
 

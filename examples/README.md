@@ -132,11 +132,21 @@ For Web client:
 
 ### Server Setup
 
-You need an AG-UI compatible server. For Crush:
+Crush enables AG-UI via config. Add to `crush.json`:
 
-```bash
-crush --agui --agui-port 8080
+```json
+{
+  "options": {
+    "agui_server": {
+      "enabled": true,
+      "port": 8080,
+      "base_path": "/agui"
+    }
+  }
+}
 ```
+
+Or use TUI: `/` → **Configure AGUI Server**. Default: `http://localhost:8080/agui`.
 
 ### Choose Your Client
 
