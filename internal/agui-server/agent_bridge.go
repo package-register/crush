@@ -11,6 +11,9 @@ import (
 	"github.com/charmbracelet/crush/internal/agent"
 )
 
+// Ensure AgentBridge implements Canceler.
+var _ Canceler = (*AgentBridge)(nil)
+
 // AgentBridge bridges AG-UI events with the Crush Agent system.
 // It converts Agent events to AG-UI protocol events and manages state synchronization.
 type AgentBridge struct {
@@ -165,51 +168,39 @@ func (b *AgentBridge) Execute(ctx context.Context, req RunRequest) error {
 	return nil
 }
 
+// Cancel cancels a running agent session by threadID.
+func (b *AgentBridge) Cancel(ctx context.Context, threadID string) error {
+	if !b.coordinator.IsSessionBusy(threadID) {
+		return ErrRunNotFound
+	}
+	b.coordinator.Cancel(threadID)
+	return nil
+}
+
 // processAgentResult processes the agent result and emits corresponding AG-UI events.
-// Note: This is a simplified implementation. The actual fantasy.AgentResult structure
-// may have different fields that need to be handled.
 func (b *AgentBridge) processAgentResult(threadID, runID string, result *fantasy.AgentResult) error {
 	if result == nil {
 		return fmt.Errorf("agent result is nil")
 	}
 
-	// Note: The actual AgentResult structure from fantasy package may have different fields.
-	// This is a placeholder implementation that emits a simple completion event.
-	// TODO: Update this when the actual AgentResult structure is known.
+	// Emit TEXT_MESSAGE_* so agui-web-client can display assistant reply
+	msgID := fmt.Sprintf("msg-%s-%s", threadID, runID)
+	text := result.Response.Content.Text()
 
-	// Emit activity events to show processing
-	activityStartEvent := NewEvent(ActivityStart, ActivityStartEvent{
-		ActivityID: fmt.Sprintf("activity-%s", runID),
-		Name:       "Processing",
-	})
-	if err := b.eventEmitter.EmitToThread(threadID, activityStartEvent); err != nil {
+	startEvent := TextMessageStartBuilder().WithMessageID(msgID).Build()
+	if err := b.eventEmitter.EmitToThread(threadID, startEvent); err != nil {
 		return err
 	}
-
-	// Emit activity update
-	activityUpdateEvent := NewEvent(ActivityUpdate, ActivityUpdateEvent{
-		ActivityID: fmt.Sprintf("activity-%s", runID),
-		Progress:   intPtr(100),
-		Status:     "completed",
-	})
-	if err := b.eventEmitter.EmitToThread(threadID, activityUpdateEvent); err != nil {
+	contentEvent := TextMessageContentBuilder().WithMessageID(msgID).WithContent(text).Build()
+	if err := b.eventEmitter.EmitToThread(threadID, contentEvent); err != nil {
 		return err
 	}
-
-	// Emit activity end
-	activityEndEvent := NewEvent(ActivityEnd, ActivityEndEvent{
-		ActivityID: fmt.Sprintf("activity-%s", runID),
-	})
-	if err := b.eventEmitter.EmitToThread(threadID, activityEndEvent); err != nil {
+	endEvent := TextMessageEndBuilder().WithMessageID(msgID).Build()
+	if err := b.eventEmitter.EmitToThread(threadID, endEvent); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-// intPtr returns a pointer to an int.
-func intPtr(i int) *int {
-	return &i
 }
 
 // EventEmitter implementations.
