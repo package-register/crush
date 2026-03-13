@@ -49,7 +49,8 @@ export interface UIMessage {
 }
 
 /**
- * Parse SSE frame and extract event data
+ * Parse SSE frame and extract event data.
+ * Crush sends { type, timestamp, data } - we flatten data for handler convenience.
  */
 function parseSseFrame(frame: string): AguiEvent | null {
   const lines = frame.split(/\r?\n/);
@@ -67,17 +68,31 @@ function parseSseFrame(frame: string): AguiEvent | null {
   }
 
   try {
-    return JSON.parse(data) as AguiEvent;
+    const raw = JSON.parse(data) as AguiEvent & { data?: Record<string, unknown> };
+    // Flatten data onto event so handlers can use event.content, event.error, etc.
+    if (raw.data && typeof raw.data === 'object') {
+      return { ...raw.data, type: raw.type, timestamp: raw.timestamp } as AguiEvent;
+    }
+    return raw;
   } catch {
     return { type: 'CUSTOM', raw: data, timestamp: Date.now() };
   }
 }
 
 /**
- * Stream AG-UI SSE events from server
+ * Derive run URL from SSE endpoint. Crush uses GET /agui/sse and POST /agui/run.
+ */
+function getRunUrl(sseUrl: string): string {
+  const base = sseUrl.split('?')[0].replace(/\/sse\/?$/, '');
+  return base + (base.endsWith('/') ? 'run' : '/run');
+}
+
+/**
+ * Stream AG-UI events from Crush server.
+ * Crush uses dual endpoints: GET /agui/sse for streaming, POST /agui/run to trigger.
  */
 export async function streamAguiSse(
-  url: string,
+  sseUrl: string,
   payload: {
     threadId: string;
     runId: string;
@@ -90,73 +105,76 @@ export async function streamAguiSse(
     signal?: AbortSignal;
   },
 ): Promise<void> {
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        'Cache-Control': 'no-cache',
-      },
-      body: JSON.stringify(payload),
-      signal: options.signal,
-    });
+  const runUrl = getRunUrl(sseUrl);
+  const sep = sseUrl.includes('?') ? '&' : '?';
+  const sseUrlWithQuery = `${sseUrl}${sep}threadId=${encodeURIComponent(payload.threadId)}&runId=${encodeURIComponent(payload.runId)}`;
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new Error(`AG-UI request failed (${response.status}): ${text || response.statusText}`);
-    }
+  return new Promise((resolve, reject) => {
+    const handleAbort = () => {
+      eventSource.close();
+      options.onComplete?.();
+      resolve();
+    };
 
-    if (!response.body) {
-      throw new Error('AG-UI response body is empty');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      buffer = buffer.replace(/\r\n/g, '\n');
-
-      while (true) {
-        const boundaryIndex = buffer.indexOf('\n\n');
-        if (boundaryIndex === -1) {
-          break;
-        }
-
-        const frame = buffer.slice(0, boundaryIndex);
-        buffer = buffer.slice(boundaryIndex + 2);
-        const event = parseSseFrame(frame);
-
-        if (event) {
-          options.onEvent(event);
-        }
-      }
-    }
-
-    // Process remaining buffer
-    const tail = buffer.trim();
-    if (tail) {
-      const event = parseSseFrame(tail);
-      if (event) {
-        options.onEvent(event);
-      }
-    }
-
-    options.onComplete?.();
-  } catch (error) {
     if (options.signal?.aborted) {
+      handleAbort();
       return;
     }
-    options.onError?.(error as Error);
-    throw error;
-  }
+
+    const eventSource = new EventSource(sseUrlWithQuery);
+    let finished = false;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      eventSource.close();
+      options.onComplete?.();
+      resolve();
+    };
+
+    options.signal?.addEventListener('abort', handleAbort);
+
+    eventSource.onopen = () => {
+      // Connection established - trigger the run
+      fetch(runUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: options.signal,
+      })
+        .then((r) => {
+          if (!r.ok) {
+            return r.text().then((t) => {
+              throw new Error(`AG-UI run failed (${r.status}): ${t || r.statusText}`);
+            });
+          }
+        })
+        .catch((err) => {
+          if (options.signal?.aborted) return;
+          options.onError?.(err);
+          reject(err);
+          finish();
+        });
+    };
+
+    eventSource.onmessage = (e) => {
+      const event = parseSseFrame(e.data);
+      if (event) {
+        options.onEvent(event);
+        if (event.type === 'RUN_FINISHED' || event.type === 'RUN_ERROR') {
+          finish();
+        }
+      }
+    };
+
+    eventSource.onerror = () => {
+      if (options.signal?.aborted) return;
+      if (!finished) {
+        options.onError?.(new Error('SSE connection error'));
+        finish();
+      }
+    };
+  });
 }
 
 /**

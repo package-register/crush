@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { streamAguiSse, type AguiEvent, type UIMessage, generateId, formatEventText } from './agui';
+import React, { useCallback, useRef, useState } from 'react';
+import { formatEventText, generateId, streamAguiSse, type AguiEvent, type UIMessage } from './agui';
 
 const DEFAULT_ENDPOINT = 'http://localhost:8080/agui/sse';
 
