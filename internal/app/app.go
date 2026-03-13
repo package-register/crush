@@ -107,25 +107,6 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 		agentNotifications: pubsub.NewBroker[notify.Notification](),
 	}
 
-	// Initialize AG-UI server if enabled
-	if cfg.Options != nil && cfg.Options.AguiServer != nil && cfg.Options.AguiServer.IsEnabled() {
-		serverCfg := aguiserver.ServerConfig{
-			Port:        cfg.Options.AguiServer.GetPort(),
-			BasePath:    cfg.Options.AguiServer.GetBasePath(),
-			CORSOrigins: cfg.Options.AguiServer.GetCORSOrigins(),
-		}
-		app.AguiServer = aguiserver.NewServer(serverCfg)
-		app.cleanupFuncs = append(app.cleanupFuncs, func(ctx context.Context) error {
-			return app.AguiServer.Stop(ctx)
-		})
-		// Start AG-UI server in background
-		go func() {
-			if err := app.AguiServer.Start(ctx); err != nil && err != http.ErrServerClosed {
-				slog.Error("AG-UI server error", "error", err)
-			}
-		}()
-	}
-
 	app.setupEvents()
 
 	// Check for updates in the background.
@@ -149,6 +130,26 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize coder agent: %w", err)
 	}
 
+	// Initialize AG-UI server if enabled (requires AgentCoordinator)
+	if cfg.Options != nil && cfg.Options.AguiServer != nil && cfg.Options.AguiServer.IsEnabled() {
+		serverCfg := aguiserver.ServerConfig{
+			Port:        cfg.Options.AguiServer.GetPort(),
+			BasePath:    cfg.Options.AguiServer.GetBasePath(),
+			CORSOrigins: cfg.Options.AguiServer.GetCORSOrigins(),
+		}
+		aguiCoord := aguiserver.NewAGUICoordinator(app.AgentCoordinator, app.Sessions, app.Permissions)
+		app.AguiServer = aguiserver.NewServerWithAgent(serverCfg, aguiCoord)
+		app.cleanupFuncs = append(app.cleanupFuncs, func(ctx context.Context) error {
+			return app.AguiServer.Stop(ctx)
+		})
+		// Start AG-UI server in background
+		go func() {
+			if err := app.AguiServer.Start(ctx); err != nil && err != http.ErrServerClosed {
+				slog.Error("AG-UI server error", "error", err)
+			}
+		}()
+	}
+
 	// Set up callback for LSP state updates.
 	app.LSPManager.SetCallback(func(name string, client *lsp.Client) {
 		if client == nil {
@@ -166,6 +167,36 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 // Config returns the application configuration.
 func (app *App) Config() *config.Config {
 	return app.config
+}
+
+// StartOrRestartAguiServer stops the existing AGUI server if running, then
+// starts a new one when enabled in config.
+func (app *App) StartOrRestartAguiServer(ctx context.Context) error {
+	if app.AguiServer != nil {
+		if err := app.AguiServer.Stop(ctx); err != nil {
+			slog.Error("AG-UI server stop error", "error", err)
+		}
+	}
+
+	cfg := app.config
+	if cfg.Options != nil && cfg.Options.AguiServer != nil && cfg.Options.AguiServer.IsEnabled() && app.AgentCoordinator != nil {
+		serverCfg := aguiserver.ServerConfig{
+			Port:        cfg.Options.AguiServer.GetPort(),
+			BasePath:    cfg.Options.AguiServer.GetBasePath(),
+			CORSOrigins: cfg.Options.AguiServer.GetCORSOrigins(),
+		}
+		aguiCoord := aguiserver.NewAGUICoordinator(app.AgentCoordinator, app.Sessions, app.Permissions)
+		app.AguiServer = aguiserver.NewServerWithAgent(serverCfg, aguiCoord)
+		app.cleanupFuncs = append(app.cleanupFuncs, func(ctx context.Context) error {
+			return app.AguiServer.Stop(ctx)
+		})
+		go func() {
+			if err := app.AguiServer.Start(app.globalCtx); err != nil && err != http.ErrServerClosed {
+				slog.Error("AG-UI server error", "error", err)
+			}
+		}()
+	}
+	return nil
 }
 
 // AgentNotifications returns the broker for agent notification events.

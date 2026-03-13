@@ -355,6 +355,8 @@ type Styles struct {
 		NormalItem   lipgloss.Style
 		SelectedItem lipgloss.Style
 		InputPrompt  lipgloss.Style
+		// FormLabel is for form field labels without margin (e.g. config dialogs).
+		FormLabel lipgloss.Style
 
 		List lipgloss.Style
 
@@ -1298,6 +1300,7 @@ func DefaultStyles() Styles {
 	s.Dialog.NormalItem = base.Padding(0, 1).Foreground(fgBase)
 	s.Dialog.SelectedItem = base.Padding(0, 1).Background(primary).Foreground(fgBase)
 	s.Dialog.InputPrompt = base.Margin(1, 1)
+	s.Dialog.FormLabel = base.Padding(0, 1)
 
 	s.Dialog.List = base.Margin(0, 0, 1, 0)
 	s.Dialog.ContentPanel = base.Background(bgSubtle).Foreground(fgBase).Padding(1, 2)

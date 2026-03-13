@@ -62,8 +62,10 @@ func TestServer_Stop(t *testing.T) {
 	// Add some connections
 	conn1 := NewConnection("conn1", "thread1", "run1")
 	conn2 := NewConnection("conn2", "thread2", "run2")
-	server.connections[conn1.ID] = conn1
-	server.connections[conn2.ID] = conn2
+	if server.connectionManager != nil {
+		server.connectionManager.Add(conn1)
+		server.connectionManager.Add(conn2)
+	}
 
 	ctx := context.Background()
 	err := srv.Stop(ctx)
@@ -86,9 +88,9 @@ func TestServer_Stop(t *testing.T) {
 		t.Error("conn2 should be closed")
 	}
 
-	// Verify connections map is cleared
-	if len(server.connections) != 0 {
-		t.Errorf("Expected connections map to be cleared, got %d entries", len(server.connections))
+	// Verify connections are cleared
+	if server.connectionManager != nil && server.connectionManager.Count() != 0 {
+		t.Errorf("Expected connections to be cleared, got %d entries", server.connectionManager.Count())
 	}
 }
 

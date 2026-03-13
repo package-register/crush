@@ -93,12 +93,12 @@ func TestServerConnectionsMap(t *testing.T) {
 		t.Fatal("Expected server to be of type *server")
 	}
 
-	if server.connections == nil {
-		t.Error("Expected connections map to be initialized")
+	if server.connectionManager == nil {
+		t.Error("Expected connectionManager to be initialized")
 	}
 
-	if len(server.connections) != 0 {
-		t.Errorf("Expected empty connections map, got %d entries", len(server.connections))
+	if server.connectionManager.Count() != 0 {
+		t.Errorf("Expected empty connections, got %d entries", server.connectionManager.Count())
 	}
 }
 

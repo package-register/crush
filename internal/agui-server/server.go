@@ -3,6 +3,7 @@ package aguiserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -63,10 +64,9 @@ func (s *server) Stop(ctx context.Context) error {
 	}
 
 	// Close all connections
-	for _, conn := range s.connections {
-		close(conn.Done)
+	if s.connectionManager != nil {
+		s.connectionManager.CloseAll()
 	}
-	s.connections = make(map[string]*Connection)
 
 	hs := s.httpServer
 	s.httpServer = nil
@@ -101,15 +101,15 @@ func (s *server) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	conn := NewConnection(uuid.New().String(), threadID, runID)
 
 	// Register connection
-	s.mu.Lock()
-	s.connections[conn.ID] = conn
-	s.mu.Unlock()
+	if s.connectionManager != nil {
+		s.connectionManager.Add(conn)
+	}
 
 	// Ensure cleanup
 	defer func() {
-		s.mu.Lock()
-		delete(s.connections, conn.ID)
-		s.mu.Unlock()
+		if s.connectionManager != nil {
+			s.connectionManager.Remove(conn.ID)
+		}
 		close(conn.Done)
 	}()
 
@@ -176,6 +176,20 @@ func (s *server) HandleRun(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
+
+	// Start agent execution in background
+	s.mu.RLock()
+	executor := s.agentExecutor
+	s.mu.RUnlock()
+	if executor != nil {
+		go func() {
+			ctx := context.WithoutCancel(r.Context())
+			if err := executor.Execute(ctx, req); err != nil {
+				// Error already emitted by AgentBridge via eventEmitter
+				_ = err
+			}
+		}()
+	}
 }
 
 // validateRequest validates a run request.
@@ -228,16 +242,25 @@ func (s *server) HandleCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if agentExecutor supports cancellation
 	s.mu.RLock()
-	historySvc := s.historyService
+	executor := s.agentExecutor
 	s.mu.RUnlock()
 
-	_ = ctx
-	_ = historySvc
-	// TODO: Implement actual cancellation logic when agent integration is ready
-	// For now, return not found as placeholder
-	http.Error(w, "cancel not yet implemented", http.StatusNotImplemented)
+	canceler, ok := executor.(Canceler)
+	if !ok || canceler == nil {
+		http.Error(w, "executor does not support cancel", http.StatusNotImplemented)
+		return
+	}
+	if err := canceler.Cancel(ctx, req.ThreadID); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, ErrRunNotFound) {
+			status = http.StatusNotFound
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(http.StatusOK)
 }
 
 // HandleHistory handles history snapshot requests with SSE streaming.

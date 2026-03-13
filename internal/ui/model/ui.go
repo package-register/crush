@@ -1224,6 +1224,18 @@ func (m *UI) handleDialogMsg(msg tea.Msg) tea.Cmd {
 		if m.focus == uiFocusEditor {
 			cmds = append(cmds, m.textarea.Focus())
 		}
+	case dialog.ActionConfirmStartAGUI:
+		m.dialog.CloseFrontDialog()
+		cmds = append(cmds, func() tea.Msg {
+			ctx := context.Background()
+			if err := m.com.App.StartOrRestartAguiServer(ctx); err != nil {
+				return util.ReportError(err)()
+			}
+			return util.NewInfoMsg("AGUI server started")
+		})
+		if m.focus == uiFocusEditor {
+			cmds = append(cmds, m.textarea.Focus())
+		}
 	case dialog.ActionCmd:
 		if msg.Cmd != nil {
 			cmds = append(cmds, msg.Cmd)
@@ -3414,8 +3426,9 @@ func (m *UI) drawSessionDetails(scr uv.Screen, area uv.Rectangle) {
 
 	lspSection := m.lspInfo(sectionWidth, maxItemsPerSection, false)
 	mcpSection := m.mcpInfo(sectionWidth, maxItemsPerSection, false)
+	aguiSection := m.aguiInfo(sectionWidth, false)
 	filesSection := m.filesInfo(m.com.Config().WorkingDir(), sectionWidth, maxItemsPerSection, false)
-	sections := lipgloss.JoinHorizontal(lipgloss.Top, filesSection, " ", lspSection, " ", mcpSection)
+	sections := lipgloss.JoinHorizontal(lipgloss.Top, filesSection, " ", lspSection, " ", mcpSection, " ", aguiSection)
 	uv.NewStyledString(
 		s.CompactDetails.View.
 			Width(area.Dx()).

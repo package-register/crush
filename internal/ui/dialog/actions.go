@@ -24,6 +24,10 @@ type ActionClose struct{}
 // ActionQuit is a message to quit the application.
 type ActionQuit = tea.QuitMsg
 
+// ActionConfirmStartAGUI is a message to confirm starting the AGUI server after
+// saving its configuration.
+type ActionConfirmStartAGUI struct{}
+
 // ActionOpenDialog is a message to open a dialog.
 type ActionOpenDialog struct {
 	DialogID string

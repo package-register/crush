@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/charmbracelet/crush/internal/config"
 	"github.com/charmbracelet/crush/internal/ui/common"
 	"github.com/charmbracelet/crush/internal/ui/util"
@@ -46,7 +47,7 @@ func NewWebDAVConfig(com *common.Common, webdavCfg *config.WebDAVConfig) (*WebDA
 	m := &WebDAVConfig{
 		com:        com,
 		focusIndex: 0,
-		width:      70,
+		width:      85,
 	}
 
 	innerWidth := m.width - t.Dialog.View.GetHorizontalFrameSize() - 2
@@ -91,18 +92,23 @@ func NewWebDAVConfig(com *common.Common, webdavCfg *config.WebDAVConfig) (*WebDA
 		}
 	}
 
-	for i, label := range inputLabels {
+	for i := range inputLabels {
 		input := textinput.New()
 		input.SetVirtualCursor(false)
 		input.Placeholder = defaultValues[i]
 		input.SetStyles(com.Styles.TextInput)
-		input.SetWidth(max(0, innerWidth-t.Dialog.InputPrompt.GetHorizontalFrameSize()-len(label)-2))
+		input.SetWidth(max(0, innerWidth))
 		input.SetValue(defaultValues[i])
+		if i == 2 { // Password field
+			input.EchoMode = textinput.EchoPassword
+		}
+		if i == 0 {
+			input.Focus()
+		} else {
+			input.Blur()
+		}
 		m.inputs = append(m.inputs, input)
 	}
-
-	// Focus the first input
-	m.inputs[0].Focus()
 
 	// Setup key bindings
 	m.keyMap.Save = key.NewBinding(
@@ -153,17 +159,29 @@ func (m *WebDAVConfig) HandleMsg(msg tea.Msg) Action {
 			if m.focusIndex >= len(m.inputs) {
 				m.focusIndex = 0
 			}
-			return m.focusInput(m.focusIndex)
+			cmd := m.focusInput(m.focusIndex)
+			if cmd != nil {
+				return ActionCmd{cmd}
+			}
+			return nil
 		case key.Matches(msg, m.keyMap.Prev):
 			m.focusIndex--
 			if m.focusIndex < 0 {
 				m.focusIndex = len(m.inputs) - 1
 			}
-			return m.focusInput(m.focusIndex)
+			cmd := m.focusInput(m.focusIndex)
+			if cmd != nil {
+				return ActionCmd{cmd}
+			}
+			return nil
 		case key.Matches(msg, m.keyMap.Confirm):
 			if m.focusIndex < len(m.inputs)-1 {
 				m.focusIndex++
-				return m.focusInput(m.focusIndex)
+				cmd := m.focusInput(m.focusIndex)
+				if cmd != nil {
+					return ActionCmd{cmd}
+				}
+				return nil
 			}
 			return m.saveConfig()
 		default:
@@ -187,11 +205,21 @@ func (m *WebDAVConfig) HandleMsg(msg tea.Msg) Action {
 func (m *WebDAVConfig) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	t := m.com.Styles
 
+	// Adaptive width: use area when available, clamp to sensible range
+	if area.Dx() > 0 {
+		w := min(90, max(70, area.Dx()-20))
+		if w != m.width {
+			m.width = w
+			innerWidth := m.width - t.Dialog.View.GetHorizontalFrameSize() - 2
+			for i := range m.inputs {
+				m.inputs[i].SetWidth(max(0, innerWidth))
+			}
+		}
+	}
+
 	textStyle := t.Dialog.SecondaryText
 	dialogStyle := t.Dialog.View.Width(m.width)
-	inputStyle := t.Dialog.InputPrompt
-	helpStyle := t.Dialog.HelpView
-	helpStyle = helpStyle.Width(m.width - dialogStyle.GetHorizontalFrameSize())
+	labelStyle := t.Dialog.FormLabel
 
 	var parts []string
 	parts = append(parts, m.headerView())
@@ -206,16 +234,13 @@ func (m *WebDAVConfig) Draw(scr uv.Screen, area uv.Rectangle) *tea.Cursor {
 	}
 
 	for i, input := range m.inputs {
-		label := inputStyle.Render(labels[i] + " ")
-		inputView := input.View()
-		parts = append(parts, label+inputView)
+		parts = append(parts, labelStyle.Render(labels[i]))
+		parts = append(parts, input.View())
 	}
 
 	parts = append(parts, "")
 	parts = append(parts, textStyle.Render("• Sync Interval examples: 5m, 1h, 30m"))
 	parts = append(parts, textStyle.Render("• Conflict Strategy: newer-wins, local-wins, remote-wins, backup"))
-	parts = append(parts, "")
-	parts = append(parts, helpStyle.Render(m.help.View(m)))
 
 	content := strings.Join(parts, "\n")
 	view := dialogStyle.Render(content)
@@ -236,7 +261,23 @@ func (m *WebDAVConfig) headerView() string {
 
 // Cursor returns the cursor position relative to the dialog.
 func (m *WebDAVConfig) Cursor() *tea.Cursor {
-	return InputCursor(m.com.Styles, m.inputs[m.focusIndex].Cursor())
+	cur := m.inputs[m.focusIndex].Cursor()
+	if cur == nil {
+		return nil
+	}
+	t := m.com.Styles
+	dialogStyle := t.Dialog.View.Width(m.width)
+	// Layout: header(1) + per field(label+input = 2 lines) -> line index = 1 + focusIndex*2 + 1
+	lineIndex := 1 + m.focusIndex*2 + 1
+	cur.X = dialogStyle.GetBorderLeftSize() +
+		dialogStyle.GetPaddingLeft() +
+		dialogStyle.GetMarginLeft() +
+		cur.X
+	cur.Y = dialogStyle.GetBorderTopSize() +
+		dialogStyle.GetPaddingTop() +
+		dialogStyle.GetMarginTop() +
+		lineIndex + cur.Y
+	return cur
 }
 
 // FullHelp returns the full help view.
@@ -265,14 +306,15 @@ func (m *WebDAVConfig) ShortHelp() []key.Binding {
 }
 
 func (m *WebDAVConfig) focusInput(index int) tea.Cmd {
+	var cmd tea.Cmd
 	for i := range m.inputs {
 		if i == index {
-			m.inputs[i].Focus()
+			cmd = m.inputs[i].Focus()
 		} else {
 			m.inputs[i].Blur()
 		}
 	}
-	return nil
+	return cmd
 }
 
 func (m *WebDAVConfig) saveConfig() Action {

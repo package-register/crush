@@ -185,13 +185,19 @@ func Section(t *styles.Styles, text string, width int, info ...string) string {
 	return text
 }
 
+// dialogTitleMaxFiller limits the decorative filler length to avoid visual clutter.
+const dialogTitleMaxFiller = 24
+
 // DialogTitle renders a dialog title with a decorative line filling the
-// remaining width.
+// remaining width (capped at dialogTitleMaxFiller).
 func DialogTitle(t *styles.Styles, title string, width int, fromColor, toColor color.Color) string {
 	char := "╱"
 	length := lipgloss.Width(title) + 1
 	remainingWidth := width - length
 	if remainingWidth > 0 {
+		if remainingWidth > dialogTitleMaxFiller {
+			remainingWidth = dialogTitleMaxFiller
+		}
 		lines := strings.Repeat(char, remainingWidth)
 		lines = styles.ApplyForegroundGrad(t, lines, fromColor, toColor)
 		title = title + " " + lines

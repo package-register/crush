@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/charmbracelet/crush/internal/agent"
 )
 
 // Server defines the interface for an AG-UI Protocol server.
@@ -76,12 +78,14 @@ func DefaultServerConfig() ServerConfig {
 
 // server is the default implementation of the Server interface.
 type server struct {
-	config          ServerConfig
-	rateLimitConfig RateLimitConfig
-	mu              sync.RWMutex
-	connections     map[string]*Connection
-	httpServer      *http.Server
-	historyService  HistoryService
+	config             ServerConfig
+	rateLimitConfig    RateLimitConfig
+	mu                 sync.RWMutex
+	connectionManager  *ConnectionManager
+	httpServer         *http.Server
+	historyService     HistoryService
+	agentExecutor      AgentExecutor
+	eventEmitter       EventEmitter
 	// Rate limiting components
 	globalLimiter   *TokenBucket
 	sessionLimiters *RateLimiter
@@ -95,10 +99,31 @@ func NewServer(config ServerConfig) Server {
 
 // NewServerWithRateLimit creates a new AG-UI server with rate limiting.
 func NewServerWithRateLimit(config ServerConfig, rateLimitConfig RateLimitConfig) Server {
+	return newServerWithExecutor(config, rateLimitConfig, nil, nil, NewConnectionManager())
+}
+
+// NewServerWithAgent creates an AG-UI server with agent execution support.
+func NewServerWithAgent(config ServerConfig, coordinator agent.Coordinator) Server {
+	manager := NewConnectionManager()
+	return NewServerWithAgentAndEmitter(config, coordinator, NewSimpleEventEmitter(manager), manager)
+}
+
+// NewServerWithAgentAndEmitter creates an AG-UI server with full control over executor and emitter.
+func NewServerWithAgentAndEmitter(config ServerConfig, coordinator agent.Coordinator, emitter EventEmitter, connManager *ConnectionManager) Server {
+	bridge := NewAgentBridge(coordinator, emitter)
+	return newServerWithExecutor(config, DefaultRateLimitConfig(), bridge, emitter, connManager)
+}
+
+func newServerWithExecutor(config ServerConfig, rateLimitConfig RateLimitConfig, executor AgentExecutor, emitter EventEmitter, connManager *ConnectionManager) Server {
+	if connManager == nil {
+		connManager = NewConnectionManager()
+	}
 	s := &server{
-		config:          config,
-		rateLimitConfig: rateLimitConfig,
-		connections:     make(map[string]*Connection),
+		config:            config,
+		rateLimitConfig:   rateLimitConfig,
+		connectionManager: connManager,
+		agentExecutor:     executor,
+		eventEmitter:      emitter,
 		// Initialize rate limiting components
 		globalLimiter:   NewTokenBucket(rateLimitConfig.GlobalBurst, rateLimitConfig.GlobalQPS),
 		sessionLimiters: NewRateLimiter(rateLimitConfig.SessionQPS, rateLimitConfig.SessionBurst),

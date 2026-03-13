@@ -153,6 +153,8 @@ func (m *UI) drawSidebar(scr uv.Screen, area uv.Rectangle) {
 					lspSection,
 					"",
 					mcpSection,
+					"",
+					m.aguiInfo(width, true),
 				),
 			),
 	).Draw(scr, area)
