@@ -31,6 +31,7 @@ import (
 	"github.com/charmbracelet/crush/internal/history"
 	"github.com/charmbracelet/crush/internal/log"
 	"github.com/charmbracelet/crush/internal/lsp"
+	"github.com/charmbracelet/crush/internal/memory"
 	"github.com/charmbracelet/crush/internal/message"
 	"github.com/charmbracelet/crush/internal/permission"
 	"github.com/charmbracelet/crush/internal/pubsub"
@@ -57,6 +58,7 @@ type App struct {
 	History     history.Service
 	Permissions permission.Service
 	FileTracker filetracker.Service
+	Memory      memory.Service
 
 	AgentCoordinator agent.Coordinator
 
@@ -74,7 +76,7 @@ type App struct {
 	// global context and cleanup functions
 	globalCtx          context.Context
 	cleanupFuncs       []func(context.Context) error
-	agentNotifications *pubsub.Broker[notify.Notification]
+	agentNotifications pubsub.PubSub[notify.Notification]
 }
 
 // New initializes a new application instance.
@@ -89,10 +91,20 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 		allowedTools = cfg.Permissions.AllowedTools
 	}
 
+	// Initialize memory service
+	mem, err := memory.NewService(memory.ServiceConfig{
+		DB: conn,
+	})
+	if err != nil {
+		slog.Warn("Failed to initialize memory service", "error", err)
+		mem = nil
+	}
+
 	app := &App{
 		Sessions:    sessions,
 		Messages:    messages,
 		History:     files,
+		Memory:      mem,
 		Permissions: permission.NewPermissionService(cfg.WorkingDir(), skipPermissionsRequests, allowedTools),
 		FileTracker: filetracker.NewService(q),
 		LSPManager:  lsp.NewManager(cfg),
@@ -119,6 +131,12 @@ func New(ctx context.Context, conn *sql.DB, cfg *config.Config) (*App, error) {
 		app.cleanupFuncs,
 		func(context.Context) error { return conn.Close() },
 		func(ctx context.Context) error { return mcp.Close(ctx) },
+		func(context.Context) error {
+			if mem != nil {
+				return mem.Close()
+			}
+			return nil
+		},
 	)
 
 	// TODO: remove the concept of agent config, most likely.
@@ -200,7 +218,7 @@ func (app *App) StartOrRestartAguiServer(ctx context.Context) error {
 }
 
 // AgentNotifications returns the broker for agent notification events.
-func (app *App) AgentNotifications() *pubsub.Broker[notify.Notification] {
+func (app *App) AgentNotifications() pubsub.PubSub[notify.Notification] {
 	return app.agentNotifications
 }
 
@@ -551,6 +569,7 @@ func (app *App) InitCoderAgent(ctx context.Context) error {
 		app.History,
 		app.FileTracker,
 		app.LSPManager,
+		app.Memory,
 		app.agentNotifications,
 	)
 	if err != nil {

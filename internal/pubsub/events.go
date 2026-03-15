@@ -8,10 +8,6 @@ const (
 	DeletedEvent EventType = "deleted"
 )
 
-type Subscriber[T any] interface {
-	Subscribe(context.Context) <-chan Event[T]
-}
-
 type (
 	// EventType identifies the type of event
 	EventType string
@@ -22,7 +18,16 @@ type (
 		Payload T
 	}
 
+	Subscriber[T any] interface {
+		Subscribe(context.Context) <-chan Event[T]
+	}
+
 	Publisher[T any] interface {
 		Publish(EventType, T)
+	}
+
+	PubSub[T any] interface {
+		Publisher[T]
+		Subscriber[T]
 	}
 )

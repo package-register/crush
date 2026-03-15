@@ -785,6 +785,13 @@ func allToolNames() []string {
 		"write",
 		"list_mcp_resources",
 		"read_mcp_resource",
+		// Memory tools
+		"memory_search",
+		"memory_load",
+		"memory_add",
+		"memory_update",
+		"memory_delete",
+		"memory_clear",
 	}
 }
 
