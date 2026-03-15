@@ -28,6 +28,7 @@ import (
 	"github.com/charmbracelet/crush/internal/history"
 	"github.com/charmbracelet/crush/internal/log"
 	"github.com/charmbracelet/crush/internal/lsp"
+	"github.com/charmbracelet/crush/internal/memory"
 	"github.com/charmbracelet/crush/internal/message"
 	"github.com/charmbracelet/crush/internal/oauth/copilot"
 	"github.com/charmbracelet/crush/internal/permission"
@@ -89,6 +90,7 @@ type coordinator struct {
 	history     history.Service
 	filetracker filetracker.Service
 	lspManager  *lsp.Manager
+	memory      memory.Service
 	notify      pubsub.Publisher[notify.Notification]
 
 	currentAgent SessionAgent
@@ -107,6 +109,7 @@ func NewCoordinator(
 	history history.Service,
 	filetracker filetracker.Service,
 	lspManager *lsp.Manager,
+	memory memory.Service,
 	notify pubsub.Publisher[notify.Notification],
 ) (Coordinator, error) {
 	c := &coordinator{
@@ -117,6 +120,7 @@ func NewCoordinator(
 		history:     history,
 		filetracker: filetracker,
 		lspManager:  lspManager,
+		memory:      memory,
 		notify:      notify,
 		agents:      make(map[string]SessionAgent),
 	}
@@ -414,6 +418,7 @@ func (c *coordinator) buildAgent(ctx context.Context, prompt *prompt.Prompt, age
 		IsYolo:               c.permissions.SkipRequests(),
 		Sessions:             c.sessions,
 		Messages:             c.messages,
+		Memory:               c.memory,
 		Tools:                nil,
 		ToolCallFormat:       toolCallFormat,
 		Notify:               c.notify,
@@ -501,6 +506,11 @@ func (c *coordinator) buildTools(ctx context.Context, agent config.Agent) ([]fan
 			tools.NewListMCPResourcesTool(c.cfg, c.permissions),
 			tools.NewReadMCPResourceTool(c.cfg, c.permissions),
 		)
+	}
+
+	// Add memory tools if memory service is available
+	if c.memory != nil {
+		allTools = append(allTools, c.memory.Tools()...)
 	}
 
 	var filteredTools []fantasy.AgentTool

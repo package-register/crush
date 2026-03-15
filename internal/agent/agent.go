@@ -38,6 +38,7 @@ import (
 	"github.com/charmbracelet/crush/internal/agent/tools/mcp"
 	"github.com/charmbracelet/crush/internal/config"
 	"github.com/charmbracelet/crush/internal/csync"
+	"github.com/charmbracelet/crush/internal/memory"
 	"github.com/charmbracelet/crush/internal/message"
 	"github.com/charmbracelet/crush/internal/permission"
 	"github.com/charmbracelet/crush/internal/pubsub"
@@ -111,6 +112,7 @@ type sessionAgent struct {
 	isSubAgent           bool
 	sessions             session.Service
 	messages             message.Service
+	memory               memory.Service
 	disableAutoSummarize bool
 	isYolo               bool
 	toolCallFormat       string
@@ -130,6 +132,7 @@ type SessionAgentOptions struct {
 	IsYolo               bool
 	Sessions             session.Service
 	Messages             message.Service
+	Memory               memory.Service
 	Tools                []fantasy.AgentTool
 	// ToolCallFormat: "standard" (default) or "longcat" for <longcat_tool_call> in text
 	ToolCallFormat string
@@ -151,6 +154,7 @@ func NewSessionAgent(
 		isSubAgent:           opts.IsSubAgent,
 		sessions:             opts.Sessions,
 		messages:             opts.Messages,
+		memory:               opts.Memory,
 		disableAutoSummarize: opts.DisableAutoSummarize,
 		tools:                csync.NewSliceFrom(opts.Tools),
 		isYolo:               opts.IsYolo,
@@ -242,6 +246,12 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 
 	// Add the session to the context.
 	ctx = context.WithValue(ctx, tools.SessionIDContextKey, call.SessionID)
+
+	// Add memory service and user info to context for memory tools.
+	if a.memory != nil {
+		ctx = memory.WithMemoryServiceInContext(ctx, a.memory)
+		ctx = memory.WithAppUserInContext(ctx, "crush", call.SessionID)
+	}
 
 	genCtx, cancel := context.WithCancel(ctx)
 	a.activeRequests.Set(call.SessionID, cancel)
