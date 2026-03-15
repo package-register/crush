@@ -248,9 +248,14 @@ func (a *sessionAgent) Run(ctx context.Context, call SessionAgentCall) (*fantasy
 	ctx = context.WithValue(ctx, tools.SessionIDContextKey, call.SessionID)
 
 	// Add memory service and user info to context for memory tools.
+	// Use a fixed user ID based on username for cross-session memory persistence.
 	if a.memory != nil {
 		ctx = memory.WithMemoryServiceInContext(ctx, a.memory)
-		ctx = memory.WithAppUserInContext(ctx, "crush", call.SessionID)
+		userID := os.Getenv("USER")
+		if userID == "" {
+			userID = "default"
+		}
+		ctx = memory.WithAppUserInContext(ctx, "crush", userID)
 	}
 
 	genCtx, cancel := context.WithCancel(ctx)
